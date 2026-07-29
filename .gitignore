@@ -1,0 +1,22 @@
+# dotnet
+bin/
+obj/
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IDEs
+.vs/
+.idea/
+*.swp
+*.lut
+
+# Databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
