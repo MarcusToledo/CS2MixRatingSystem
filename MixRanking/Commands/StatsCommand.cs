@@ -1,0 +1,214 @@
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Utils;
+using MixRanking.Config;
+using MixRanking.Services;
+using MixRanking.Models;
+
+namespace MixRanking.Commands;
+
+/// <summary>Comandos !stats, !lastmatch e !profile.</summary>
+public class StatsCommand
+{
+    private readonly PlayerService _playerService;
+    private readonly RankingConfig _config;
+
+    public StatsCommand(PlayerService playerService, RankingConfig config)
+    {
+        _playerService = playerService;
+        _config = config;
+    }
+
+    /// <summary>Registra os comandos no plugin.</summary>
+    public void Register(BasePlugin plugin)
+    {
+        plugin.AddCommand("css_stats", "Mostra suas estatísticas completas.", OnStatsCommand);
+        plugin.AddCommand("css_lastmatch", "Mostra o resumo da última partida.", OnLastMatchCommand);
+        plugin.AddCommand("css_profile", "Mostra seu perfil detalhado.", OnProfileCommand);
+    }
+
+    private void OnStatsCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        if (player == null || !player.IsValid) return;
+
+        string steamId = player.SteamID.ToString();
+        int slot = player.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var playerData = await _playerService.GetPlayerAsync(steamId);
+
+                Server.NextFrame(() =>
+                {
+                    var targetPlayer = Utilities.GetPlayerFromSlot(slot);
+                    if (targetPlayer == null || !targetPlayer.IsValid) return;
+
+                    if (playerData == null || playerData.Matches == 0)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Gold}[{_config.ChatPrefix}]{ChatColors.Default} Você ainda não jogou nenhuma partida rankeada.");
+                        return;
+                    }
+
+                    double kd = playerData.Deaths > 0 ? (double)playerData.Kills / playerData.Deaths : playerData.Kills;
+                    double winrate = playerData.Matches > 0 ? (double)playerData.Wins / playerData.Matches * 100 : 0;
+                    // Approximate total rounds (average 24 rounds per match)
+                    long estimatedRounds = playerData.Matches * 24L;
+                    double adr = estimatedRounds > 0 ? (double)playerData.Damage / estimatedRounds : 0;
+
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}📊 ══════════ Estatísticas ══════════ 📊");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}👤 {ChatColors.Default}Jogador: {ChatColors.Green}{playerData.Name} {ChatColors.Grey}│ {ChatColors.Default}Rating: {ChatColors.Yellow}{playerData.Rating}");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}🎮 {ChatColors.Default}Partidas: {ChatColors.Default}{playerData.Matches} {ChatColors.Grey}│ {ChatColors.Default}Winrate: {ChatColors.Lime}{winrate:F1}% {ChatColors.Grey}({playerData.Wins}V - {playerData.Losses}D)");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}💀 {ChatColors.Default}Kills: {ChatColors.Green}{playerData.Kills} {ChatColors.Grey}│ {ChatColors.Default}Deaths: {ChatColors.Red}{playerData.Deaths} {ChatColors.Grey}│ {ChatColors.Default}Assists: {ChatColors.Silver}{playerData.Assists}");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}🎯 {ChatColors.Default}K/D: {ChatColors.Olive}{kd:F2} {ChatColors.Grey}│ {ChatColors.Default}ADR: {ChatColors.Olive}{adr:F1} {ChatColors.Grey}│ {ChatColors.Default}MVPs: {ChatColors.Yellow}{playerData.Mvps}");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}📊 ══════════════════════════════════ 📊");
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{_config.ChatPrefix}] Erro ao buscar estatísticas: {ex.Message}");
+                Server.NextFrame(() =>
+                {
+                    var targetPlayer = Utilities.GetPlayerFromSlot(slot);
+                    if (targetPlayer != null && targetPlayer.IsValid)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Red}[{_config.ChatPrefix}] Erro ao buscar estatísticas.");
+                    }
+                });
+            }
+        });
+    }
+
+    private void OnLastMatchCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        if (player == null || !player.IsValid) return;
+
+        string steamId = player.SteamID.ToString();
+        int slot = player.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var lastChange = await _playerService.GetLastRatingChangeAsync(steamId);
+                MatchRecord? match = null;
+
+                if (lastChange != null)
+                {
+                    match = await _playerService.GetMatchByIdAsync(lastChange.MatchId);
+                }
+
+                Server.NextFrame(() =>
+                {
+                    var targetPlayer = Utilities.GetPlayerFromSlot(slot);
+                    if (targetPlayer == null || !targetPlayer.IsValid) return;
+
+                    if (lastChange == null)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Gold}[{_config.ChatPrefix}]{ChatColors.Default} Nenhuma partida encontrada.");
+                        return;
+                    }
+
+                    string resultText = lastChange.TotalChange >= 0
+                        ? $"{ChatColors.Green}+{lastChange.TotalChange}"
+                        : $"{ChatColors.Red}{lastChange.TotalChange}";
+
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}🎮 ══════════ Última Partida ══════════ 🎮");
+                    if (match != null)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Gold}🗺️ {ChatColors.Default}Mapa: {ChatColors.Yellow}{match.Map} {ChatColors.Grey}│ {ChatColors.Default}Placar: {ChatColors.Blue}{match.CtScore} {ChatColors.Default}x {ChatColors.Red}{match.TScore}");
+                    }
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}⚡ {ChatColors.Default}Rating: {ChatColors.Default}{lastChange.OldRating} → {ChatColors.Yellow}{lastChange.NewRating} {ChatColors.Grey}({resultText}{ChatColors.Grey})");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}📈 {ChatColors.Default}Base: {ChatColors.Default}{lastChange.BaseChange:+#;-#;0} {ChatColors.Grey}│ {ChatColors.Default}Swing: {ChatColors.Default}{lastChange.PerformanceSwing:+#;-#;0}");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}🎮 ═══════════════════════════════════ 🎮");
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{_config.ChatPrefix}] Erro ao buscar última partida: {ex.Message}");
+                Server.NextFrame(() =>
+                {
+                    var targetPlayer = Utilities.GetPlayerFromSlot(slot);
+                    if (targetPlayer != null && targetPlayer.IsValid)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Red}[{_config.ChatPrefix}] Erro ao buscar última partida.");
+                    }
+                });
+            }
+        });
+    }
+
+    private void OnProfileCommand(CCSPlayerController? player, CommandInfo command)
+    {
+        if (player == null || !player.IsValid) return;
+
+        string steamId = player.SteamID.ToString();
+        int slot = player.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var playerData = await _playerService.GetPlayerAsync(steamId);
+                int rankPosition = 0;
+                int totalPlayers = 0;
+                List<RatingChange> history = new();
+
+                if (playerData != null && playerData.Matches > 0)
+                {
+                    rankPosition = await _playerService.GetRankPositionAsync(steamId);
+                    totalPlayers = await _playerService.GetTotalRankedPlayersAsync();
+                    history = await _playerService.GetRatingHistoryAsync(steamId, 5);
+                }
+
+                Server.NextFrame(() =>
+                {
+                    var targetPlayer = Utilities.GetPlayerFromSlot(slot);
+                    if (targetPlayer == null || !targetPlayer.IsValid) return;
+
+                    if (playerData == null || playerData.Matches == 0)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Gold}[{_config.ChatPrefix}]{ChatColors.Default} Você ainda não jogou nenhuma partida rankeada.");
+                        return;
+                    }
+
+                    double kd = playerData.Deaths > 0 ? (double)playerData.Kills / playerData.Deaths : playerData.Kills;
+                    double winrate = playerData.Matches > 0 ? (double)playerData.Wins / playerData.Matches * 100 : 0;
+
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}👤 ══════════ Perfil Geral ══════════ 👤");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}👤 {ChatColors.Default}Jogador: {ChatColors.Green}{playerData.Name}");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}🏆 {ChatColors.Default}Rating: {ChatColors.Yellow}{playerData.Rating} {ChatColors.Grey}│ {ChatColors.Default}Rank: {ChatColors.Yellow}#{rankPosition} {ChatColors.Grey}(de {totalPlayers})");
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}📊 {ChatColors.Default}W/L: {ChatColors.Green}{playerData.Wins}V{ChatColors.Default}/{ChatColors.Red}{playerData.Losses}D {ChatColors.Grey}({winrate:F1}%) {ChatColors.Grey}│ {ChatColors.Default}K/D: {ChatColors.Olive}{kd:F2}");
+
+                    if (history.Count > 0)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Gold}📈 {ChatColors.Default}Últimas partidas:");
+                        foreach (var change in history)
+                        {
+                            string changeText = change.TotalChange >= 0
+                                ? $"{ChatColors.Green}+{change.TotalChange}"
+                                : $"{ChatColors.Red}{change.TotalChange}";
+                            targetPlayer.PrintToChat($"   {ChatColors.Grey}• {ChatColors.Default}{change.OldRating} → {ChatColors.Yellow}{change.NewRating} {ChatColors.Grey}({changeText}{ChatColors.Grey})");
+                        }
+                    }
+
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}👤 ══════════════════════════════════ 👤");
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{_config.ChatPrefix}] Erro ao buscar perfil: {ex.Message}");
+                Server.NextFrame(() =>
+                {
+                    var targetPlayer = Utilities.GetPlayerFromSlot(slot);
+                    if (targetPlayer != null && targetPlayer.IsValid)
+                    {
+                        targetPlayer.PrintToChat($" {ChatColors.Red}[{_config.ChatPrefix}] Erro ao buscar perfil.");
+                    }
+                });
+            }
+        });
+    }
+}

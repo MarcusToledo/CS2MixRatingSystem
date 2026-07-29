@@ -1,0 +1,261 @@
+using CounterStrikeSharp.API;
+using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Admin;
+using CounterStrikeSharp.API.Modules.Commands;
+using CounterStrikeSharp.API.Modules.Utils;
+using MixRanking.Config;
+using MixRanking.Database;
+
+namespace MixRanking.Commands;
+
+/// <summary>Comandos administrativos para gerenciar ratings.</summary>
+public class AdminCommands
+{
+    private readonly DatabaseService _db;
+    private readonly RankingConfig _config;
+
+    public AdminCommands(DatabaseService db, RankingConfig config)
+    {
+        _db = db;
+        _config = config;
+    }
+
+    /// <summary>Registra os comandos admin no plugin.</summary>
+    public void Register(BasePlugin plugin)
+    {
+        plugin.AddCommand("css_rating_set", "[ADMIN] Seta o rating de um jogador.", OnRatingSet);
+        plugin.AddCommand("css_rating_reset", "[ADMIN] Reseta um jogador.", OnRatingReset);
+        plugin.AddCommand("css_rating_add", "[ADMIN] Adiciona pontos de rating.", OnRatingAdd);
+        plugin.AddCommand("css_rating_remove", "[ADMIN] Remove pontos de rating.", OnRatingRemove);
+        plugin.AddCommand("css_rating_wipe", "[ADMIN] Reseta completamente o ranking (deleta todos os dados).", OnRatingWipe);
+    }
+
+    [RequiresPermissions("@css/root")]
+    private void OnRatingSet(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!ValidateAdmin(player)) return;
+
+        if (command.ArgCount < 3)
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_set <steamid64> <valor>");
+            return;
+        }
+
+        string targetSteamId = command.ArgByIndex(1);
+        if (!int.TryParse(command.ArgByIndex(2), out int newRating))
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Valor inválido.");
+            return;
+        }
+
+        newRating = Math.Max(newRating, _config.MinRating);
+        int? slot = player?.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var targetPlayer = await _db.GetPlayerAsync(targetSteamId);
+                if (targetPlayer == null)
+                {
+                    PrintToPlayer(slot, $"{ChatColors.Red}Jogador não encontrado no banco.");
+                    return;
+                }
+
+                await _db.SetPlayerRatingAsync(targetSteamId, newRating);
+                PrintToPlayer(slot, $"{ChatColors.Green}Rating de {targetPlayer.Name} setado para {newRating}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GurizadaMix] Erro ao setar rating: {ex.Message}");
+                PrintToPlayer(slot, $"{ChatColors.Red}Erro ao setar rating.");
+            }
+        });
+    }
+
+    [RequiresPermissions("@css/root")]
+    private void OnRatingReset(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!ValidateAdmin(player)) return;
+
+        if (command.ArgCount < 2)
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_reset <steamid64>");
+            return;
+        }
+
+        string targetSteamId = command.ArgByIndex(1);
+        int? slot = player?.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var targetPlayer = await _db.GetPlayerAsync(targetSteamId);
+                if (targetPlayer == null)
+                {
+                    PrintToPlayer(slot, $"{ChatColors.Red}Jogador não encontrado no banco.");
+                    return;
+                }
+
+                await _db.ResetPlayerAsync(targetSteamId, _config.InitialRating);
+                PrintToPlayer(slot, $"{ChatColors.Green}Jogador {targetPlayer.Name} resetado para {_config.InitialRating}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GurizadaMix] Erro ao resetar jogador: {ex.Message}");
+                PrintToPlayer(slot, $"{ChatColors.Red}Erro ao resetar jogador.");
+            }
+        });
+    }
+
+    [RequiresPermissions("@css/root")]
+    private void OnRatingAdd(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!ValidateAdmin(player)) return;
+
+        if (command.ArgCount < 3)
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_add <steamid64> <valor>");
+            return;
+        }
+
+        string targetSteamId = command.ArgByIndex(1);
+        if (!int.TryParse(command.ArgByIndex(2), out int amount) || amount <= 0)
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Valor inválido (deve ser positivo).");
+            return;
+        }
+
+        int? slot = player?.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var targetPlayer = await _db.GetPlayerAsync(targetSteamId);
+                if (targetPlayer == null)
+                {
+                    PrintToPlayer(slot, $"{ChatColors.Red}Jogador não encontrado no banco.");
+                    return;
+                }
+
+                int newRating = targetPlayer.Rating + amount;
+                await _db.SetPlayerRatingAsync(targetSteamId, newRating);
+                PrintToPlayer(slot, $"{ChatColors.Green}+{amount} rating para {targetPlayer.Name}. Novo: {newRating}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GurizadaMix] Erro ao adicionar rating: {ex.Message}");
+                PrintToPlayer(slot, $"{ChatColors.Red}Erro ao adicionar rating.");
+            }
+        });
+    }
+
+    [RequiresPermissions("@css/root")]
+    private void OnRatingRemove(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!ValidateAdmin(player)) return;
+
+        if (command.ArgCount < 3)
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_remove <steamid64> <valor>");
+            return;
+        }
+
+        string targetSteamId = command.ArgByIndex(1);
+        if (!int.TryParse(command.ArgByIndex(2), out int amount) || amount <= 0)
+        {
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Valor inválido (deve ser positivo).");
+            return;
+        }
+
+        int? slot = player?.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                var targetPlayer = await _db.GetPlayerAsync(targetSteamId);
+                if (targetPlayer == null)
+                {
+                    PrintToPlayer(slot, $"{ChatColors.Red}Jogador não encontrado no banco.");
+                    return;
+                }
+
+                int newRating = Math.Max(targetPlayer.Rating - amount, _config.MinRating);
+                await _db.SetPlayerRatingAsync(targetSteamId, newRating);
+                PrintToPlayer(slot, $"{ChatColors.Green}-{amount} rating de {targetPlayer.Name}. Novo: {newRating}.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GurizadaMix] Erro ao remover rating: {ex.Message}");
+                PrintToPlayer(slot, $"{ChatColors.Red}Erro ao remover rating.");
+            }
+        });
+    }
+
+    [RequiresPermissions("@css/root")]
+    private void OnRatingWipe(CCSPlayerController? player, CommandInfo command)
+    {
+        if (!ValidateAdmin(player)) return;
+
+        int? slot = player?.Slot;
+
+        Task.Run(async () =>
+        {
+            try
+            {
+                await _db.ResetAllDataAsync();
+                PrintToPlayer(slot, $"{ChatColors.Green}Ranking completamente resetado! Todos os dados de jogadores e partidas foram eliminados.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[{_config.ChatPrefix}] Erro ao limpar banco de dados: {ex.Message}");
+                PrintToPlayer(slot, $"{ChatColors.Red}Erro ao resetar o ranking.");
+            }
+        });
+    }
+
+    /// <summary>Valida se quem executou tem permissão de admin.</summary>
+    private bool ValidateAdmin(CCSPlayerController? player)
+    {
+        if (player == null) return true; // Server console always allowed
+
+        if (!AdminManager.PlayerHasPermissions(player, "@css/root"))
+        {
+            player.PrintToChat($" {ChatColors.Red}[GurizadaMix] Sem permissão.");
+            return false;
+        }
+        return true;
+    }
+
+    /// <summary>Envia mensagem de forma segura no thread principal após tarefa background.</summary>
+    private void PrintToPlayer(int? slot, string message)
+    {
+        Server.NextFrame(() =>
+        {
+            if (slot.HasValue)
+            {
+                var targetPlayer = Utilities.GetPlayerFromSlot(slot.Value);
+                if (targetPlayer != null && targetPlayer.IsValid)
+                {
+                    targetPlayer.PrintToChat($" {ChatColors.Gold}[GurizadaMix]{ChatColors.Default} {message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"[GurizadaMix] {message}");
+            }
+        });
+    }
+
+    /// <summary>Envia mensagem diretamente (usada fora de Task.Run, ou seja, no thread principal).</summary>
+    private void PrintToPlayerDirect(CCSPlayerController? player, string message)
+    {
+        if (player != null && player.IsValid)
+            player.PrintToChat($" {ChatColors.Gold}[GurizadaMix]{ChatColors.Default} {message}");
+        else
+            Console.WriteLine($"[GurizadaMix] {message}");
+    }
+}
