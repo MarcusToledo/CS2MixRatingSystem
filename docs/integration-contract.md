@@ -17,6 +17,10 @@ This document details the database schema and data format contract between the C
 > **Separation of Concerns:**  
 > The plugin acts as the system of record for rating calculations and match performance statistics. Rating tier thresholds (e.g., Bronze, Silver, Gold rank badges) are **not** managed by the plugin. The web platform is responsible for interpreting the rating numbers and defining levels/tiers.
 
+> [!IMPORTANT]
+> **Read-only web access:**  
+> The plugin is the system of record. The web platform must treat the replicated SQLite data as read-only and must not directly modify ratings, statistics, seasons, or match records.
+
 ---
 
 ## 2. SQLite Schema Specification
@@ -42,10 +46,13 @@ Metadata for game seasons.
 - `is_active` (`INTEGER`): Boolean flag (1 = active, 0 = inactive). Only one season can be active at a time.
 
 ### `season_ratings`
-A derived ledger of ratings scoped by season.
+A materialized per-season rating aggregate. A player's row is created on their first recorded match in the season, starting from `InitialRating` plus the first match delta. Subsequent match deltas are accumulated in this table.
+
+Administrative rating changes (`SET`, `RESET`, `ADD`, or `REMOVE`) affect the global rating in `players`, but are not automatically reflected in `season_ratings`.
+
 - `season_id` (`INTEGER`): References `seasons(id)`.
 - `steamid` (`TEXT`): References `players(steamid)`.
-- `rating` (`INTEGER`): Elo rating in this season (starts at `InitialRating` at season start, follows lifetime delta changes).
+- `rating` (`INTEGER`): Elo rating in this season.
 - `matches` / `wins` / `losses` (`INTEGER`): Scoped season statistics.
 - `updated_at` (`TEXT`): Last update timestamp.
 *Composite Primary Key:* `(season_id, steamid)`
@@ -53,7 +60,7 @@ A derived ledger of ratings scoped by season.
 ### `matches`
 Record of completed matches.
 - `id` (`INTEGER`, PRIMARY KEY AUTOINCREMENT): Unique match identifier.
-- `match_guid` (`TEXT`): UUID string representing the match.
+- `match_guid` (`TEXT`): Application-generated UUID string representing the match. It is indexed, but database-level uniqueness is not currently enforced.
 - `map` (`TEXT`): Map name (e.g., `de_mirage`).
 - `winner_team` (`INTEGER`): Winner side (2 = Terrorists, 3 = CTs).
 - `ct_score` / `t_score` (`INTEGER`): Scores per team.
@@ -67,8 +74,8 @@ Granular record of all rating changes per player per match.
 - `steamid` (`TEXT`): References `players(steamid)`.
 - `old_rating` (`INTEGER`): Rating before the match.
 - `base_change` (`INTEGER`): Pure Elo delta from win/loss expectation.
-- `performance_swing` (`INTEGER`): Individual stats adjustment delta.
-- `total_change` (`INTEGER`): Total delta applied (`base_change` + `performance_swing`).
+- `performance_swing` (`INTEGER`): Individual performance adjustment. If the player abandoned the match, the configured abandonment penalty is also subtracted from this value.
+- `total_change` (`INTEGER`): Actual rating delta applied (`new_rating - old_rating`). Normally equals `base_change + performance_swing`, but may differ when the minimum-rating floor is applied.
 - `new_rating` (`INTEGER`): Rating after the match.
 - `season_id` (`INTEGER`): References `seasons(id)`.
 - `k_factor_used` (`INTEGER`, NULL): The effective K-factor value applied (e.g., `100` during placement, `50` normally).
@@ -99,13 +106,23 @@ Audit trail of all administrative rating alterations.
 - `reason` (`TEXT`, NULL): Optional justification entered by the admin.
 - `created_at` (`TEXT`): Time the administrative action occurred.
 
----
-
-## 3. Date and Time Format Inconsistencies
+> [!NOTE]
+> **`SET` / `RESET` / `ADD` / `REMOVE` and `rating_history`:**  
+> These four actions are recorded only in `admin_audit_log`. They do not generate entries in `rating_history` and do not update `season_ratings`. Therefore, the current value in `players.rating` may not always equal the last `rating_history.new_rating`.
 
 > [!WARNING]
-> Please note the following difference in timestamp formats when querying tables:
-> - **Matches table (`matches.finished_at`):** Uses ISO-8601 format with timezone offset (e.g. `"2026-07-31T18:01:10.0000000Z"`).
-> - **Other tables (`created_at`, `updated_at`):** Uses SQLite default native UTC timestamps (e.g. `"2026-07-31 18:01:10"` without `T`, `Z`, or fractional seconds).
->
-> Parsing code on the web backend must be flexible enough to handle both patterns.
+> **`WIPE` is destructive, not just unrecorded:**  
+> Unlike the four actions above, `WIPE` deletes all rows from `rating_history`, `match_player_stats`, `season_ratings`, and `matches`, and clears every player from `players` (not just the `rating` column). A replicated copy of this database must treat a `WIPE` audit entry as a signal to clear those tables too, not merely as an unreflected change.
+
+---
+
+## 3. Date and Time Formats
+
+Timestamp columns are stored as `TEXT`, and the database schema does not enforce a single format.
+
+Values normally written by the current plugin use:
+
+- `matches.finished_at`: .NET round-trip ISO-8601 UTC format, such as `"2026-07-31T18:01:10.0000000Z"`.
+- SQLite-generated timestamps: UTC format such as `"2026-07-31 18:01:10"`.
+
+The web backend must accept both formats and interpret SQLite `datetime('now')` values as UTC, not as server-local time.
