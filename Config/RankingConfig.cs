@@ -33,6 +33,14 @@ public class RankingConfig : BasePluginConfig
     [JsonPropertyName("MinRating")]
     public int MinRating { get; set; } = 100;
 
+    /// <summary>Número de partidas de placement.</summary>
+    [JsonPropertyName("PlacementMatchCount")]
+    public int PlacementMatchCount { get; set; } = 10;
+
+    /// <summary>Multiplicador do fator K durante o placement.</summary>
+    [JsonPropertyName("PlacementKFactorMultiplier")]
+    public double PlacementKFactorMultiplier { get; set; } = 2.0;
+
     /// <summary>Prefixo utilizado nas mensagens do chat.</summary>
     [JsonPropertyName("ChatPrefix")]
     public string ChatPrefix { get; set; } = "GurizadaMix";
