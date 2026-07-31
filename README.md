@@ -43,7 +43,7 @@ Requer a permissão `@css/root`.
 ## Compilação
 
 ```bash
-dotnet build MixRanking/MixRanking.csproj -c Release
+dotnet build MixRanking.csproj -c Release
 ```
 
 ## Status
