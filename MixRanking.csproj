@@ -13,4 +13,10 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="MixRanking.Tests\**" />
+    <EmbeddedResource Remove="MixRanking.Tests\**" />
+    <None Remove="MixRanking.Tests\**" />
+  </ItemGroup>
 </Project>
