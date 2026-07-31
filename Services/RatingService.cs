@@ -39,26 +39,26 @@ public class RatingService
         int tScore,
         Dictionary<ulong, MatchPlayerStats> playerStats)
     {
-        // 1. Insert match record
-        var matchRecord = new MatchRecord
-        {
-            MatchGuid = matchGuid,
-            Map = map,
-            WinnerTeam = (int)winnerTeam,
-            CtScore = ctScore,
-            TScore = tScore,
-            FinishedAt = DateTime.UtcNow
-        };
-        long matchId = await _db.InsertMatchAsync(matchRecord);
+        // 1. Separate players by team and batch retrieve player data
+        var steamIds = playerStats.Keys.Select(k => k.ToString()).ToList();
+        var existingPlayers = await _db.GetPlayersBySteamIdsAsync(steamIds);
 
-        // 2. Separate players by team and get current ratings
         var ctPlayers = new List<(MatchPlayerStats Stats, PlayerData Data)>();
         var tPlayers = new List<(MatchPlayerStats Stats, PlayerData Data)>();
 
         foreach (var (steamId, stats) in playerStats)
         {
-            var playerData = await _db.GetOrCreatePlayerAsync(
-                steamId.ToString(), stats.PlayerName, _config.InitialRating);
+            string steamIdStr = steamId.ToString();
+            if (!existingPlayers.TryGetValue(steamIdStr, out var playerData))
+            {
+                playerData = new PlayerData
+                {
+                    SteamId = steamIdStr,
+                    Name = stats.PlayerName,
+                    Rating = _config.InitialRating,
+                    Matches = 0
+                };
+            }
 
             if (stats.Team == CsTeam.CounterTerrorist)
                 ctPlayers.Add((stats, playerData));
@@ -66,7 +66,7 @@ public class RatingService
                 tPlayers.Add((stats, playerData));
         }
 
-        // 3. Calculate team average ratings
+        // 2. Calculate team average ratings
         double ctAvgRating = ctPlayers.Count > 0
             ? ctPlayers.Average(p => p.Data.Rating)
             : _config.InitialRating;
@@ -74,8 +74,11 @@ public class RatingService
             ? tPlayers.Average(p => p.Data.Rating)
             : _config.InitialRating;
 
-        // 4. Calculate rating changes for each player
+        // 3. Calculate rating changes for each player
         var ratingChanges = new List<RatingChange>();
+        var playerUpdates = new List<MatchPlayerUpdate>();
+
+        int activeSeasonId = await _db.GetActiveSeasonIdAsync();
 
         foreach (var (stats, playerData) in ctPlayers.Concat(tPlayers))
         {
@@ -83,8 +86,13 @@ public class RatingService
             double teamAvg = stats.Team == CsTeam.CounterTerrorist ? ctAvgRating : tAvgRating;
             double opponentAvg = stats.Team == CsTeam.CounterTerrorist ? tAvgRating : ctAvgRating;
 
+            // Placement match K-factor logic
+            int effectiveK = playerData.Matches < _config.PlacementMatchCount
+                ? (int)Math.Round(_config.KFactor * _config.PlacementKFactorMultiplier)
+                : _config.KFactor;
+
             // Base Elo change
-            int baseChange = EloCalculator.CalculateBaseChange(teamAvg, opponentAvg, won, _config.KFactor);
+            int baseChange = EloCalculator.CalculateBaseChange(teamAvg, opponentAvg, won, effectiveK);
 
             // Performance swing
             int swing = SwingCalculator.CalculateSwing(stats, _config.MaxSwing);
@@ -104,26 +112,41 @@ public class RatingService
             var ratingChange = new RatingChange
             {
                 SteamId = playerData.SteamId,
-                MatchId = matchId,
+                MatchId = 0, // Will be updated during transactional write
                 OldRating = playerData.Rating,
                 BaseChange = baseChange,
                 PerformanceSwing = swing,
                 TotalChange = newRating - playerData.Rating,
                 NewRating = newRating,
                 PlayerName = stats.PlayerName,
-                Won = won
+                Won = won,
+                KFactorUsed = effectiveK
             };
 
-            // 5. Persist to database
-            await _db.UpdatePlayerAfterMatchAsync(
-                playerData.SteamId, newRating, won,
-                stats.Kills, stats.Deaths, stats.Assists,
-                stats.Damage, stats.Mvps);
-
-            await _db.InsertRatingChangeAsync(ratingChange);
-
             ratingChanges.Add(ratingChange);
+
+            playerUpdates.Add(new MatchPlayerUpdate
+            {
+                Stats = stats,
+                PlayerData = playerData,
+                RatingChange = ratingChange,
+                NewRating = newRating,
+                Won = won
+            });
         }
+
+        // 4. Persist match record and updates in a single transaction
+        var matchRecord = new MatchRecord
+        {
+            MatchGuid = matchGuid,
+            Map = map,
+            WinnerTeam = (int)winnerTeam,
+            CtScore = ctScore,
+            TScore = tScore,
+            FinishedAt = DateTime.UtcNow
+        };
+
+        await _db.WriteMatchEndResultAsync(matchRecord, playerUpdates, _config.InitialRating, activeSeasonId);
 
         return ratingChanges;
     }

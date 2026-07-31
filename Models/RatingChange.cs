@@ -27,6 +27,9 @@ public class RatingChange
     /// <summary>Rating após a partida.</summary>
     public int NewRating { get; set; }
 
+    /// <summary>K-factor utilizado na partida.</summary>
+    public int? KFactorUsed { get; set; }
+
     /// <summary>Nome do jogador (para exibição).</summary>
     public string PlayerName { get; set; } = string.Empty;
 
