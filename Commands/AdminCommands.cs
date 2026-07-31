@@ -37,7 +37,7 @@ public class AdminCommands
 
         if (command.ArgCount < 3)
         {
-            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_set <steamid64> <valor>");
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_set <steamid64> <valor> [motivo...]");
             return;
         }
 
@@ -50,6 +50,19 @@ public class AdminCommands
 
         newRating = Math.Max(newRating, _config.MinRating);
         int? slot = player?.Slot;
+        string? adminSteamId = player?.SteamID.ToString();
+        string adminName = player?.PlayerName ?? "CONSOLE";
+
+        string? reason = null;
+        if (command.ArgCount > 3)
+        {
+            var reasonArgs = new List<string>();
+            for (int i = 3; i < command.ArgCount; i++)
+            {
+                reasonArgs.Add(command.ArgByIndex(i));
+            }
+            reason = string.Join(" ", reasonArgs);
+        }
 
         Task.Run(async () =>
         {
@@ -62,7 +75,7 @@ public class AdminCommands
                     return;
                 }
 
-                await _db.SetPlayerRatingAsync(targetSteamId, newRating);
+                await _db.SetPlayerRatingWithAuditAsync(targetSteamId, newRating, adminSteamId, adminName, reason);
                 PrintToPlayer(slot, $"{ChatColors.Green}Rating de {targetPlayer.Name} setado para {newRating}.");
             }
             catch (Exception ex)
@@ -80,12 +93,25 @@ public class AdminCommands
 
         if (command.ArgCount < 2)
         {
-            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_reset <steamid64>");
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_reset <steamid64> [motivo...]");
             return;
         }
 
         string targetSteamId = command.ArgByIndex(1);
         int? slot = player?.Slot;
+        string? adminSteamId = player?.SteamID.ToString();
+        string adminName = player?.PlayerName ?? "CONSOLE";
+
+        string? reason = null;
+        if (command.ArgCount > 2)
+        {
+            var reasonArgs = new List<string>();
+            for (int i = 2; i < command.ArgCount; i++)
+            {
+                reasonArgs.Add(command.ArgByIndex(i));
+            }
+            reason = string.Join(" ", reasonArgs);
+        }
 
         Task.Run(async () =>
         {
@@ -98,7 +124,7 @@ public class AdminCommands
                     return;
                 }
 
-                await _db.ResetPlayerAsync(targetSteamId, _config.InitialRating);
+                await _db.ResetPlayerWithAuditAsync(targetSteamId, _config.InitialRating, adminSteamId, adminName, reason);
                 PrintToPlayer(slot, $"{ChatColors.Green}Jogador {targetPlayer.Name} resetado para {_config.InitialRating}.");
             }
             catch (Exception ex)
@@ -116,7 +142,7 @@ public class AdminCommands
 
         if (command.ArgCount < 3)
         {
-            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_add <steamid64> <valor>");
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_add <steamid64> <valor> [motivo...]");
             return;
         }
 
@@ -128,6 +154,19 @@ public class AdminCommands
         }
 
         int? slot = player?.Slot;
+        string? adminSteamId = player?.SteamID.ToString();
+        string adminName = player?.PlayerName ?? "CONSOLE";
+
+        string? reason = null;
+        if (command.ArgCount > 3)
+        {
+            var reasonArgs = new List<string>();
+            for (int i = 3; i < command.ArgCount; i++)
+            {
+                reasonArgs.Add(command.ArgByIndex(i));
+            }
+            reason = string.Join(" ", reasonArgs);
+        }
 
         Task.Run(async () =>
         {
@@ -140,8 +179,8 @@ public class AdminCommands
                     return;
                 }
 
+                await _db.AdjustPlayerRatingWithAuditAsync(targetSteamId, amount, isAdd: true, minRating: _config.MinRating, adminSteamId: adminSteamId, adminName: adminName, reason: reason);
                 int newRating = targetPlayer.Rating + amount;
-                await _db.SetPlayerRatingAsync(targetSteamId, newRating);
                 PrintToPlayer(slot, $"{ChatColors.Green}+{amount} rating para {targetPlayer.Name}. Novo: {newRating}.");
             }
             catch (Exception ex)
@@ -159,7 +198,7 @@ public class AdminCommands
 
         if (command.ArgCount < 3)
         {
-            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_remove <steamid64> <valor>");
+            PrintToPlayerDirect(player, $"{ChatColors.Red}Uso: !rating_remove <steamid64> <valor> [motivo...]");
             return;
         }
 
@@ -171,6 +210,19 @@ public class AdminCommands
         }
 
         int? slot = player?.Slot;
+        string? adminSteamId = player?.SteamID.ToString();
+        string adminName = player?.PlayerName ?? "CONSOLE";
+
+        string? reason = null;
+        if (command.ArgCount > 3)
+        {
+            var reasonArgs = new List<string>();
+            for (int i = 3; i < command.ArgCount; i++)
+            {
+                reasonArgs.Add(command.ArgByIndex(i));
+            }
+            reason = string.Join(" ", reasonArgs);
+        }
 
         Task.Run(async () =>
         {
@@ -183,8 +235,8 @@ public class AdminCommands
                     return;
                 }
 
+                await _db.AdjustPlayerRatingWithAuditAsync(targetSteamId, amount, isAdd: false, minRating: _config.MinRating, adminSteamId: adminSteamId, adminName: adminName, reason: reason);
                 int newRating = Math.Max(targetPlayer.Rating - amount, _config.MinRating);
-                await _db.SetPlayerRatingAsync(targetSteamId, newRating);
                 PrintToPlayer(slot, $"{ChatColors.Green}-{amount} rating de {targetPlayer.Name}. Novo: {newRating}.");
             }
             catch (Exception ex)
@@ -201,12 +253,25 @@ public class AdminCommands
         if (!ValidateAdmin(player)) return;
 
         int? slot = player?.Slot;
+        string? adminSteamId = player?.SteamID.ToString();
+        string adminName = player?.PlayerName ?? "CONSOLE";
+
+        string? reason = null;
+        if (command.ArgCount > 1)
+        {
+            var reasonArgs = new List<string>();
+            for (int i = 1; i < command.ArgCount; i++)
+            {
+                reasonArgs.Add(command.ArgByIndex(i));
+            }
+            reason = string.Join(" ", reasonArgs);
+        }
 
         Task.Run(async () =>
         {
             try
             {
-                await _db.ResetAllDataAsync();
+                await _db.ResetAllDataWithAuditAsync(adminSteamId, adminName, reason);
                 PrintToPlayer(slot, $"{ChatColors.Green}Ranking completamente resetado! Todos os dados de jogadores e partidas foram eliminados.");
             }
             catch (Exception ex)
