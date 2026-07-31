@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using MixRanking.Models;
+using MixRanking.Rating;
 
 namespace MixRanking.Database;
 
@@ -232,41 +233,6 @@ public class DatabaseService
         };
     }
 
-    /// <summary>Atualiza estatísticas e rating de um jogador após uma partida.</summary>
-    public async Task UpdatePlayerAfterMatchAsync(string steamId, int newRating, bool won,
-        int kills, int deaths, int assists, int damage, int mvps)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = @"
-            UPDATE players SET
-                rating = $rating,
-                matches = matches + 1,
-                wins = wins + $winIncrement,
-                losses = losses + $lossIncrement,
-                kills = kills + $kills,
-                deaths = deaths + $deaths,
-                assists = assists + $assists,
-                damage = damage + $damage,
-                mvps = mvps + $mvps,
-                updated_at = datetime('now')
-            WHERE steamid = $steamId";
-
-        command.Parameters.AddWithValue("$rating", newRating);
-        command.Parameters.AddWithValue("$winIncrement", won ? 1 : 0);
-        command.Parameters.AddWithValue("$lossIncrement", won ? 0 : 1);
-        command.Parameters.AddWithValue("$kills", kills);
-        command.Parameters.AddWithValue("$deaths", deaths);
-        command.Parameters.AddWithValue("$assists", assists);
-        command.Parameters.AddWithValue("$damage", damage);
-        command.Parameters.AddWithValue("$mvps", mvps);
-        command.Parameters.AddWithValue("$steamId", steamId);
-
-        await command.ExecuteNonQueryAsync();
-    }
-
     /// <summary>Retorna os top N jogadores por rating.</summary>
     public async Task<List<PlayerData>> GetTopPlayersAsync(int count = 10)
     {
@@ -305,51 +271,6 @@ public class DatabaseService
 
         var result = await command.ExecuteScalarAsync();
         return Convert.ToInt32(result);
-    }
-
-    /// <summary>Insere um registro de partida e retorna o ID.</summary>
-    public async Task<long> InsertMatchAsync(MatchRecord match)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = @"
-            INSERT INTO matches (match_guid, map, winner_team, ct_score, t_score, finished_at)
-            VALUES ($matchGuid, $map, $winnerTeam, $ctScore, $tScore, $finishedAt);
-            SELECT last_insert_rowid();";
-
-        command.Parameters.AddWithValue("$matchGuid", match.MatchGuid);
-        command.Parameters.AddWithValue("$map", match.Map);
-        command.Parameters.AddWithValue("$winnerTeam", match.WinnerTeam);
-        command.Parameters.AddWithValue("$ctScore", match.CtScore);
-        command.Parameters.AddWithValue("$tScore", match.TScore);
-        command.Parameters.AddWithValue("$finishedAt", match.FinishedAt.ToString("o"));
-
-        var result = await command.ExecuteScalarAsync();
-        return Convert.ToInt64(result);
-    }
-
-    /// <summary>Insere um registro de mudança de rating.</summary>
-    public async Task InsertRatingChangeAsync(RatingChange change)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = @"
-            INSERT INTO rating_history (match_id, steamid, old_rating, base_change, performance_swing, total_change, new_rating)
-            VALUES ($matchId, $steamId, $oldRating, $baseChange, $performanceSwing, $totalChange, $newRating)";
-
-        command.Parameters.AddWithValue("$matchId", change.MatchId);
-        command.Parameters.AddWithValue("$steamId", change.SteamId);
-        command.Parameters.AddWithValue("$oldRating", change.OldRating);
-        command.Parameters.AddWithValue("$baseChange", change.BaseChange);
-        command.Parameters.AddWithValue("$performanceSwing", change.PerformanceSwing);
-        command.Parameters.AddWithValue("$totalChange", change.TotalChange);
-        command.Parameters.AddWithValue("$newRating", change.NewRating);
-
-        await command.ExecuteNonQueryAsync();
     }
 
     /// <summary>Retorna o último rating change de um jogador.</summary>
@@ -464,37 +385,6 @@ public class DatabaseService
         return ReadPlayerFromReader(reader);
     }
 
-    /// <summary>Seta o rating de um jogador (admin).</summary>
-    public async Task SetPlayerRatingAsync(string steamId, int rating)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = "UPDATE players SET rating = $rating, updated_at = datetime('now') WHERE steamid = $steamId";
-        command.Parameters.AddWithValue("$rating", rating);
-        command.Parameters.AddWithValue("$steamId", steamId);
-        await command.ExecuteNonQueryAsync();
-    }
-
-    /// <summary>Reseta completamente um jogador (admin).</summary>
-    public async Task ResetPlayerAsync(string steamId, int initialRating)
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = @"
-            UPDATE players SET
-                rating = $rating, matches = 0, wins = 0, losses = 0,
-                kills = 0, deaths = 0, assists = 0, damage = 0, mvps = 0,
-                updated_at = datetime('now')
-            WHERE steamid = $steamId";
-        command.Parameters.AddWithValue("$rating", initialRating);
-        command.Parameters.AddWithValue("$steamId", steamId);
-        await command.ExecuteNonQueryAsync();
-    }
-
     /// <summary>Retorna o total de jogadores com pelo menos uma partida.</summary>
     public async Task<int> GetTotalRankedPlayersAsync()
     {
@@ -505,22 +395,6 @@ public class DatabaseService
         command.CommandText = "SELECT COUNT(*) FROM players WHERE matches > 0";
         var result = await command.ExecuteScalarAsync();
         return Convert.ToInt32(result);
-    }
-
-    /// <summary>Deleta todos os dados de todas as tabelas (limpa o banco de dados).</summary>
-    public async Task ResetAllDataAsync()
-    {
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = @"
-            DELETE FROM rating_history;
-            DELETE FROM matches;
-            DELETE FROM players;
-            VACUUM;
-        ";
-        await command.ExecuteNonQueryAsync();
     }
 
     public async Task<Dictionary<string, PlayerData>> GetPlayersBySteamIdsAsync(List<string> steamIds)
@@ -699,8 +573,7 @@ public class DatabaseService
                         $kastPercent, $abandoned, $seasonId
                     )";
 
-                double kastRounds = stats.RoundsWithKill + (stats.Assists * 0.5) + stats.RoundsSurvived + stats.TradeKills;
-                double kastPercent = stats.RoundsPlayed > 0 ? Math.Min(kastRounds / stats.RoundsPlayed, 1.0) : 0.0;
+                double kastPercent = SwingCalculator.CalculateKastPercent(stats);
 
                 insertStatsCmd.Parameters.AddWithValue("$matchId", matchId);
                 insertStatsCmd.Parameters.AddWithValue("$steamId", playerData.SteamId);
