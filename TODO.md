@@ -5,23 +5,27 @@ Contexto: MVP funcional em staging, ainda não exposto a jogadores reais. Forma�
 times é feita por uma plataforma web externa (mesma equipe), que hoje atribui níveis
 manualmente. A visão é que o rating calculado aqui alimente esses níveis no futuro.
 
-## Fase 0 — Antes de lançar (decisões caras de reverter depois)
+## Fase 0 — Antes de lançar (decisões caras de reverter depois) ✅ Concluída
 
-- [ ] Criar tabela `match_player_stats` para persistir estatísticas detalhadas por
+- [x] Criar tabela `match_player_stats` para persistir estatísticas detalhadas por
       partida/jogador (ADR, KAST real, KPR, clutches, HS%, trade kills, opening duels).
       Hoje só existem totais cumulativos em `players` e deltas grosseiros em
       `rating_history` — impossível reconstruir retroativamente "como foi minha
       partida X".
-- [ ] Adicionar `season_id` ao schema (`matches`, `rating_history`, e uma tabela de
+      `clutches_won`/`headshots`/`hs_percent` existem como colunas placeholder
+      (sempre 0) — a detecção real fica para uma fase futura.
+- [x] Adicionar `season_id` ao schema (`matches`, `rating_history`, e uma tabela de
       rating por temporada separada de `players`), mesmo que só exista 1 temporada
       no início.
-- [ ] Implementar audit log para ações administrativas (`rating_set`, `rating_add`,
+- [x] Implementar audit log para ações administrativas (`rating_set`, `rating_add`,
       `rating_remove`, `rating_wipe`): quem alterou, valor antigo, valor novo, motivo,
       timestamp.
-- [ ] Confirmar fórmula-base definitiva de rating e decidir sobre K-factor dinâmico /
+- [x] Confirmar fórmula-base definitiva de rating e decidir sobre K-factor dinâmico /
       período de placement matches (K maior nas primeiras N partidas de cada jogador).
-- [ ] Desenhar o contrato de dados com a plataforma web (schema/API), mesmo que a
+      Implementado como K 2× nas primeiras 10 partidas, configurável.
+- [x] Desenhar o contrato de dados com a plataforma web (schema/API), mesmo que a
       integração real venha depois — SteamID64 já é a chave compartilhada.
+      Ver `docs/integration-contract.md`.
 
 ## Fase 1 — Lançamento
 
