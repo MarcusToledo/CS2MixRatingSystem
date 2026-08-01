@@ -69,7 +69,9 @@ para calcular o nível, não há necessidade de guardar/ordenar um log de evento
   - `DrainPendingAsync()` — lê pendentes (lote limitado, ex: 100 linhas), monta o
     payload, chama `IWebSyncClient`, marca sucesso ou mantém pendente em falha.
 - **Pontos de chamada de `MarkDirtyAsync`:**
-  - `MatchService`, após persistir o novo rating de cada jogador ao fim de partida.
+  - `RatingService.ProcessMatchEndAsync`, logo após `WriteMatchEndResultAsync` persistir o
+    novo rating de cada jogador (é `RatingService`, não `MatchService`, quem de fato
+    grava no banco ao fim de partida).
   - `AdminCommands`, após `SET`/`RESET`/`ADD`/`REMOVE` (ações que alteram um jogador
     existente).
   - `WIPE` é um caso à parte — ver "Caso especial: WIPE" abaixo. Não usa
