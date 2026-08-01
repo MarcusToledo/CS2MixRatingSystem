@@ -544,6 +544,26 @@ public class DatabaseService
         return entries;
     }
 
+    /// <summary>Remove da fila os jogadores já sincronizados com sucesso.</summary>
+    public async Task ClearWebSyncQueueEntriesAsync(List<string> steamIds)
+    {
+        if (steamIds.Count == 0) return;
+
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        var parameterNames = new List<string>();
+        for (int i = 0; i < steamIds.Count; i++)
+        {
+            var paramName = $"$steamId{i}";
+            parameterNames.Add(paramName);
+            command.Parameters.AddWithValue(paramName, steamIds[i]);
+        }
+        command.CommandText = $"DELETE FROM web_sync_queue WHERE steamid IN ({string.Join(",", parameterNames)})";
+        await command.ExecuteNonQueryAsync();
+    }
+
     public async Task WriteMatchEndResultAsync(MatchRecord match, List<MatchPlayerUpdate> updates, int initialRating, int activeSeasonId)
     {
         await using var connection = new SqliteConnection(_connectionString);

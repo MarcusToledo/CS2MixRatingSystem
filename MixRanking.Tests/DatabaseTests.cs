@@ -396,4 +396,37 @@ public class DatabaseTests : IDisposable
 
         Assert.Equal(3, limited.Count);
     }
+
+    [Fact]
+    public async Task ClearWebSyncQueueEntriesAsync_RemovesOnlySpecifiedEntries()
+    {
+        await _db.InitializeAsync();
+
+        await _db.UpsertWebSyncQueueAsync(new PlayerData { SteamId = "76561198000000021", Name = "A", CreatedAt = DateTime.UtcNow });
+        await _db.UpsertWebSyncQueueAsync(new PlayerData { SteamId = "76561198000000022", Name = "B", CreatedAt = DateTime.UtcNow });
+
+        // Act
+        await _db.ClearWebSyncQueueEntriesAsync(new List<string> { "76561198000000021" });
+
+        // Assert
+        var remaining = await _db.GetPendingWebSyncEntriesAsync(limit: 10);
+        Assert.Single(remaining);
+        Assert.Equal("76561198000000022", remaining[0].SteamId);
+    }
+
+    [Fact]
+    public async Task ClearWebSyncQueueEntriesAsync_IsNoOpOnEmptyList()
+    {
+        await _db.InitializeAsync();
+
+        await _db.UpsertWebSyncQueueAsync(new PlayerData { SteamId = "76561198000000023", Name = "C", CreatedAt = DateTime.UtcNow });
+
+        // Act - clear with empty list should not remove anything
+        await _db.ClearWebSyncQueueEntriesAsync(new List<string>());
+
+        // Assert - the entry should still be there
+        var remaining = await _db.GetPendingWebSyncEntriesAsync(limit: 10);
+        Assert.Single(remaining);
+        Assert.Equal("76561198000000023", remaining[0].SteamId);
+    }
 }
