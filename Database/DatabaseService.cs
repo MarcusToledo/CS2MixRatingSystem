@@ -14,7 +14,7 @@ public class DatabaseService
         _connectionString = $"Data Source={dbPath}";
     }
 
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
 
     private const string Migration1_Baseline = @"
         CREATE TABLE IF NOT EXISTS players (
@@ -141,6 +141,29 @@ public class DatabaseService
         CREATE INDEX IF NOT EXISTS idx_admin_audit_log_created ON admin_audit_log(created_at);
     ";
 
+    private const string Migration5_WebSyncQueue = @"
+        CREATE TABLE IF NOT EXISTS web_sync_queue (
+            steamid TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            rating INTEGER NOT NULL,
+            matches INTEGER NOT NULL,
+            wins INTEGER NOT NULL,
+            losses INTEGER NOT NULL,
+            kills INTEGER NOT NULL,
+            deaths INTEGER NOT NULL,
+            assists INTEGER NOT NULL,
+            damage INTEGER NOT NULL,
+            mvps INTEGER NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS web_sync_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            wipe_pending INTEGER NOT NULL DEFAULT 0
+        );
+        INSERT INTO web_sync_state (id, wipe_pending) VALUES (1, 0);
+    ";
+
     /// <summary>Cria as tabelas se não existirem rodando as migrações necessárias.</summary>
     public async Task InitializeAsync()
     {
@@ -156,6 +179,7 @@ public class DatabaseService
         if (version < 2) { await RunMigrationAsync(connection, Migration2_MatchPlayerStats); version = 2; await SetUserVersionAsync(connection, version); }
         if (version < 3) { await RunMigrationAsync(connection, Migration3_Seasons); version = 3; await SetUserVersionAsync(connection, version); }
         if (version < 4) { await RunMigrationAsync(connection, Migration4_AdminAuditLog); version = 4; await SetUserVersionAsync(connection, version); }
+        if (version < 5) { await RunMigrationAsync(connection, Migration5_WebSyncQueue); version = 5; await SetUserVersionAsync(connection, version); }
     }
 
     private async Task<int> GetUserVersionAsync(SqliteConnection connection)

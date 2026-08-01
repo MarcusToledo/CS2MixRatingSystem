@@ -38,12 +38,20 @@ public class DatabaseTests : IDisposable
         using var command = connection.CreateCommand();
         command.CommandText = "PRAGMA user_version;";
         var version = Convert.ToInt32(await command.ExecuteScalarAsync());
-        Assert.Equal(4, version);
+        Assert.Equal(5, version);
 
         // Verify seasons exists and contains Season 1
         command.CommandText = "SELECT COUNT(*) FROM seasons WHERE name = 'Season 1' AND is_active = 1;";
         var seasonCount = Convert.ToInt32(await command.ExecuteScalarAsync());
         Assert.Equal(1, seasonCount);
+
+        // Verify web_sync_queue table exists and starts empty
+        command.CommandText = "SELECT COUNT(*) FROM web_sync_queue;";
+        Assert.Equal(0, Convert.ToInt32(await command.ExecuteScalarAsync()));
+
+        // Verify web_sync_state singleton row starts with wipe_pending = 0
+        command.CommandText = "SELECT wipe_pending FROM web_sync_state WHERE id = 1;";
+        Assert.Equal(0, Convert.ToInt32(await command.ExecuteScalarAsync()));
     }
 
     [Fact]
