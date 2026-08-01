@@ -27,15 +27,23 @@ manualmente. A visão é que o rating calculado aqui alimente esses níveis no f
       integração real venha depois — SteamID64 já é a chave compartilhada.
       Ver `docs/integration-contract.md`.
 
-## Fase 1 — Lançamento
+## Fase 1 — Lançamento ✅ Concluída
 
-- [ ] Corrigir ADR aproximado no `!rank` (usa `Matches * 24` fixo em vez de rounds
+- [x] Corrigir ADR aproximado no `!rank` (usa `Matches * 24` fixo em vez de rounds
       reais jogados).
-- [ ] Corrigir cálculo estrutural do KAST no `SwingCalculator` (double counting entre
+      Corrigido também no `!stats`. Agora soma `rounds_played` real de
+      `match_player_stats` via `GetPlayerTotalRoundsPlayedAsync`.
+- [x] Corrigir cálculo estrutural do KAST no `SwingCalculator` (double counting entre
       `RoundsWithKill` e `RoundsSurvived` no mesmo round).
-- [ ] Habilitar `PRAGMA journal_mode=WAL` no SQLite.
-- [ ] Remover o `Task.Run(...).Wait()` síncrono no `Load()` do plugin (inicialização
+      Escopo ampliado durante a implementação: `RoundsWithKast` agora é um
+      contador único por round (união, não soma) em `StatisticsService`, e o
+      crédito de "Traded" passou a ir para o jogador que morreu e foi vingado,
+      não para quem vingou (que já é contado via kill).
+- [x] Habilitar `PRAGMA journal_mode=WAL` no SQLite.
+- [x] Remover o `Task.Run(...).Wait()` síncrono no `Load()` do plugin (inicialização
       do banco).
+      Falha na inicialização do banco agora propaga (`throw`) em vez de deixar
+      o plugin carregar contra um banco quebrado.
 
 ## Fase 2 — Pós-lançamento
 
