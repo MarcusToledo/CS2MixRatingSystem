@@ -1260,9 +1260,9 @@ git commit -m "feat: mark players dirty for web sync after match end"
 
 Sem teste automatizado — `CCSPlayerController`/`CommandInfo` exigem runtime do CounterStrikeSharp, e não há testes existentes para `AdminCommands` no projeto (mesmo padrão já estabelecido).
 
-- [ ] **Step 1: Adicionar o using, o campo e atualizar o construtor**
+- [ ] **Step 1: Adicionar o using, o campo, o construtor e o helper de sync**
 
-Em `Commands/AdminCommands.cs:1-21`, adicionar o using e o campo:
+Em `Commands/AdminCommands.cs:1-21`, adicionar o using, o campo e um helper privado reutilizado pelos quatro comandos que alteram rating (evita repetir "buscar jogador atualizado + marcar dirty" em cada handler):
 
 ```csharp
 using CounterStrikeSharp.API;
@@ -1289,6 +1289,16 @@ public class AdminCommands
         _config = config;
         _webSyncService = webSyncService;
     }
+
+    /// <summary>Busca o estado atual do jogador após uma alteração de rating e marca para sync com a plataforma web.</summary>
+    private async Task MarkPlayerDirtyForWebSyncAsync(string steamId)
+    {
+        var updatedPlayer = await _db.GetPlayerAsync(steamId);
+        if (updatedPlayer != null)
+        {
+            await _webSyncService.MarkDirtyAsync(updatedPlayer);
+        }
+    }
 ```
 
 - [ ] **Step 2: Marcar dirty após `OnRatingSet`**
@@ -1304,11 +1314,7 @@ para:
 
 ```csharp
                 await _db.SetPlayerRatingWithAuditAsync(targetSteamId, newRating, adminSteamId, adminName, reason);
-                var updatedPlayer = await _db.GetPlayerAsync(targetSteamId);
-                if (updatedPlayer != null)
-                {
-                    await _webSyncService.MarkDirtyAsync(updatedPlayer);
-                }
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 PrintToPlayer(slot, $"{ChatColors.Green}Rating de {targetPlayer.Name} setado para {newRating}.");
 ```
 
@@ -1325,11 +1331,7 @@ para:
 
 ```csharp
                 await _db.ResetPlayerWithAuditAsync(targetSteamId, _config.InitialRating, adminSteamId, adminName, reason);
-                var updatedPlayer = await _db.GetPlayerAsync(targetSteamId);
-                if (updatedPlayer != null)
-                {
-                    await _webSyncService.MarkDirtyAsync(updatedPlayer);
-                }
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 PrintToPlayer(slot, $"{ChatColors.Green}Jogador {targetPlayer.Name} resetado para {_config.InitialRating}.");
 ```
 
@@ -1347,11 +1349,7 @@ para:
 
 ```csharp
                 await _db.AdjustPlayerRatingWithAuditAsync(targetSteamId, amount, isAdd: true, minRating: _config.MinRating, adminSteamId: adminSteamId, adminName: adminName, reason: reason);
-                var updatedPlayer = await _db.GetPlayerAsync(targetSteamId);
-                if (updatedPlayer != null)
-                {
-                    await _webSyncService.MarkDirtyAsync(updatedPlayer);
-                }
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 int newRating = targetPlayer.Rating + amount;
                 PrintToPlayer(slot, $"{ChatColors.Green}+{amount} rating para {targetPlayer.Name}. Novo: {newRating}.");
 ```
@@ -1370,11 +1368,7 @@ para:
 
 ```csharp
                 await _db.AdjustPlayerRatingWithAuditAsync(targetSteamId, amount, isAdd: false, minRating: _config.MinRating, adminSteamId: adminSteamId, adminName: adminName, reason: reason);
-                var updatedPlayer = await _db.GetPlayerAsync(targetSteamId);
-                if (updatedPlayer != null)
-                {
-                    await _webSyncService.MarkDirtyAsync(updatedPlayer);
-                }
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 int newRating = Math.Max(targetPlayer.Rating - amount, _config.MinRating);
                 PrintToPlayer(slot, $"{ChatColors.Green}-{amount} rating de {targetPlayer.Name}. Novo: {newRating}.");
 ```
