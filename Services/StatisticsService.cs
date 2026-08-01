@@ -93,8 +93,14 @@ public class StatisticsService
             }
         }
 
-        // Track for trade kill detection
-        _recentDeaths.Add((DateTime.UtcNow, victimSteamId, victimTeam));
+        // Track for trade kill detection — only real enemy kills create trade
+        // eligibility. A death with no real attacker (suicide, fall damage, world
+        // kill, attackerSteamId == 0) must not let a teammate's later kill be
+        // misread as a trade, nor grant the victim a phantom "traded" KAST credit.
+        if (attackerSteamId != 0)
+        {
+            _recentDeaths.Add((DateTime.UtcNow, victimSteamId, victimTeam));
+        }
     }
 
     /// <summary>Registra uma assistência.</summary>

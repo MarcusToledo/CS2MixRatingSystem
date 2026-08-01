@@ -53,6 +53,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
         catch (Exception ex)
         {
             Logger.LogError(ex, "[MixRanking] Failed to initialize database!");
+            throw;
         }
 
         // 2. Initialize services

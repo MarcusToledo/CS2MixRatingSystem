@@ -74,4 +74,75 @@ public class StatisticsServiceTests
         Assert.Equal(1, traderStats.RoundsWithKast);
         Assert.Equal(1, traderStats.TradeKills);
     }
+
+    [Fact]
+    public void RecordKill_WorldOrSelfKill_DoesNotCreateTradeCredit()
+    {
+        var service = new StatisticsService();
+        ulong teammateSteamId = 76561198000000050;
+        ulong enemySteamId = 76561198000000060;
+        service.GetOrCreateStats(VictimSteamId, "Victim", CsTeam.CounterTerrorist);
+        service.GetOrCreateStats(teammateSteamId, "Teammate", CsTeam.CounterTerrorist);
+        service.GetOrCreateStats(enemySteamId, "Enemy", CsTeam.Terrorist);
+
+        service.OnRoundStart();
+
+        // Victim dies to fall damage/world/self (no real attacker) — attackerSteamId 0
+        service.RecordKill(0, VictimSteamId, CsTeam.CounterTerrorist, false);
+
+        // Teammate then gets a normal enemy kill, well within the 5s trade window
+        service.RecordKill(teammateSteamId, enemySteamId, CsTeam.Terrorist, false);
+
+        service.OnRoundEnd(new[] { teammateSteamId });
+
+        var victimStats = service.GetAllPlayerStats()[VictimSteamId];
+        var teammateStats = service.GetAllPlayerStats()[teammateSteamId];
+
+        // The self/world death had no real enemy to trade for, so it must not
+        // grant the victim a phantom "traded" KAST credit...
+        Assert.False(victimStats.WasTradedThisRound);
+        Assert.Equal(0, victimStats.RoundsWithKast);
+        // ...nor should the teammate's unrelated enemy kill be misread as a trade kill.
+        Assert.Equal(0, teammateStats.TradeKills);
+    }
+
+    [Fact]
+    public void OnRoundEnd_NoKastEvents_RoundsWithKastStaysZero()
+    {
+        var service = new StatisticsService();
+        service.GetOrCreateStats(AttackerSteamId, "Bystander", CsTeam.CounterTerrorist);
+
+        service.OnRoundStart();
+        // No kill, no assist, does not survive (not in alive list), not traded.
+        service.OnRoundEnd(Array.Empty<ulong>());
+
+        var stats = service.GetAllPlayerStats()[AttackerSteamId];
+
+        Assert.Equal(0, stats.RoundsWithKast);
+    }
+
+    [Fact]
+    public void OnRoundEnd_AllFourKastConditions_DoesNotDoubleCount()
+    {
+        var service = new StatisticsService();
+        service.GetOrCreateStats(AttackerSteamId, "AllRounder", CsTeam.CounterTerrorist);
+        service.GetOrCreateStats(VictimSteamId, "Victim", CsTeam.Terrorist);
+
+        service.OnRoundStart();
+
+        // 1) Kill + 2) Assist for the same player in the same round.
+        service.RecordAssist(AttackerSteamId, false);
+        service.RecordKill(AttackerSteamId, VictimSteamId, CsTeam.Terrorist, false);
+
+        // 4) Traded: force the flag directly, same as the player being avenged
+        // after also dying earlier this round — MatchPlayerStats exposes it as a
+        // public settable property, which keeps this scenario simple and explicit.
+        var stats = service.GetAllPlayerStats()[AttackerSteamId];
+        stats.WasTradedThisRound = true;
+
+        // 3) Survived: included in the alive list passed to OnRoundEnd.
+        service.OnRoundEnd(new[] { AttackerSteamId });
+
+        Assert.Equal(1, stats.RoundsWithKast);
+    }
 }
