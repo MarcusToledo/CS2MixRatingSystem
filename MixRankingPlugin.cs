@@ -25,6 +25,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
 
     private DatabaseService _database = null!;
     private StatisticsService _statistics = null!;
+    private WebSyncService _webSyncService = null!;
     private RatingService _ratingService = null!;
     private PlayerService _playerService = null!;
     private MatchService _matchService = null!;
@@ -58,7 +59,9 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
 
         // 2. Initialize services
         _statistics = new StatisticsService();
-        _ratingService = new RatingService(_database, Config);
+        var httpClient = new HttpWebSyncClient(Config);
+        _webSyncService = new WebSyncService(_database, httpClient, Logger);
+        _ratingService = new RatingService(_database, Config, _webSyncService);
         _playerService = new PlayerService(_database, Config.InitialRating);
         _matchService = new MatchService(_statistics, _ratingService, Config, Logger);
 

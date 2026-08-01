@@ -1,4 +1,5 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging.Abstractions;
 using MixRanking.Config;
 using MixRanking.Database;
 using MixRanking.Models;
@@ -14,6 +15,7 @@ public class RatingTests : IDisposable
     private const string ConnectionString = "Data Source=InMemoryDbRating;Mode=Memory;Cache=Shared";
     private readonly DatabaseService _db;
     private readonly RankingConfig _config;
+    private readonly WebSyncService _webSyncService;
     private readonly RatingService _ratingService;
 
     public RatingTests()
@@ -21,7 +23,7 @@ public class RatingTests : IDisposable
         _keepAliveConnection = new SqliteConnection(ConnectionString);
         _keepAliveConnection.Open();
         _db = new DatabaseService("InMemoryDbRating;Mode=Memory;Cache=Shared");
-        
+
         _config = new RankingConfig
         {
             InitialRating = 1000,
@@ -33,7 +35,8 @@ public class RatingTests : IDisposable
             AbandonPenalty = 15
         };
 
-        _ratingService = new RatingService(_db, _config);
+        _webSyncService = new WebSyncService(_db, new FakeWebSyncClient(), NullLogger.Instance);
+        _ratingService = new RatingService(_db, _config, _webSyncService);
     }
 
     public void Dispose()
@@ -155,5 +158,53 @@ public class RatingTests : IDisposable
         // Base change = 50 * (1 - 0.7597) = 12
         Assert.Equal(12, change.BaseChange);
         Assert.Equal(1212, change.NewRating);
+    }
+
+    [Fact]
+    public async Task ProcessMatchEndAsync_MarksUpdatedPlayerForWebSync()
+    {
+        await _db.InitializeAsync();
+
+        var stats = new MatchPlayerStats
+        {
+            SteamId = 76561198000000300,
+            PlayerName = "SyncedPlayer",
+            Team = CsTeam.CounterTerrorist,
+            Kills = 20,
+            Deaths = 10,
+            Assists = 5,
+            Damage = 2000,
+            RoundsPlayed = 20,
+            RoundsSurvived = 10,
+            RoundsWithKill = 15,
+            RoundsWithKast = 18,
+            Mvps = 2,
+            OpeningKills = 1,
+            OpeningDeaths = 0,
+            TradeKills = 0,
+            FlashAssists = 1,
+            Abandoned = false
+        };
+
+        var playerStats = new Dictionary<ulong, MatchPlayerStats> { { stats.SteamId, stats } };
+
+        // Act
+        var changes = await _ratingService.ProcessMatchEndAsync(
+            Guid.NewGuid().ToString(), "de_mirage", CsTeam.CounterTerrorist, 13, 7, playerStats);
+
+        // Assert: o jogador foi marcado como pendente com os valores acumulados pós-partida
+        var pending = await _db.GetPendingWebSyncEntriesAsync(limit: 10);
+        Assert.Single(pending);
+        var entry = pending[0];
+        Assert.Equal("76561198000000300", entry.SteamId);
+        Assert.Equal(changes[0].NewRating, entry.Rating);
+        Assert.Equal(1, entry.Matches);
+        Assert.Equal(1, entry.Wins);
+        Assert.Equal(0, entry.Losses);
+        Assert.Equal(20, entry.Kills);
+        Assert.Equal(10, entry.Deaths);
+        Assert.Equal(5, entry.Assists);
+        Assert.Equal(2000, entry.Damage);
+        Assert.Equal(2, entry.Mvps);
     }
 }

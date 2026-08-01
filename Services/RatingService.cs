@@ -14,11 +14,13 @@ public class RatingService
 {
     private readonly DatabaseService _db;
     private readonly RankingConfig _config;
+    private readonly WebSyncService _webSyncService;
 
-    public RatingService(DatabaseService db, RankingConfig config)
+    public RatingService(DatabaseService db, RankingConfig config, WebSyncService webSyncService)
     {
         _db = db;
         _config = config;
+        _webSyncService = webSyncService;
     }
 
     /// <summary>
@@ -147,6 +149,13 @@ public class RatingService
         };
 
         await _db.WriteMatchEndResultAsync(matchRecord, playerUpdates, _config.InitialRating, activeSeasonId);
+
+        var updatedSteamIds = playerUpdates.Select(u => u.PlayerData.SteamId).ToList();
+        var freshPlayers = await _db.GetPlayersBySteamIdsAsync(updatedSteamIds);
+        foreach (var freshPlayer in freshPlayers.Values)
+        {
+            await _webSyncService.MarkDirtyAsync(freshPlayer);
+        }
 
         return ratingChanges;
     }
