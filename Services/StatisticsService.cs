@@ -64,10 +64,16 @@ public class StatisticsService
                     break;
 
                 // If the victim of the recent death was on the same team as the attacker,
-                // this is a trade kill (attacker traded for their fallen teammate)
+                // this is a trade kill (attacker traded for their fallen teammate).
+                // The teammate who died gets KAST credit for being traded — the avenger
+                // is already credited via GotKillThisRound, so it isn't counted twice.
                 if (death.VictimTeam == attackerStats.Team && death.VictimSteamId != attackerSteamId)
                 {
                     attackerStats.TradeKills++;
+                    if (_playerStats.TryGetValue(death.VictimSteamId, out var tradedStats))
+                    {
+                        tradedStats.WasTradedThisRound = true;
+                    }
                     break;
                 }
             }
@@ -97,6 +103,7 @@ public class StatisticsService
         if (_playerStats.TryGetValue(assistSteamId, out var stats))
         {
             stats.Assists++;
+            stats.GotAssistThisRound = true;
             if (flashAssist)
                 stats.FlashAssists++;
         }
@@ -141,7 +148,8 @@ public class StatisticsService
 
         foreach (var stats in _playerStats.Values)
         {
-            if (aliveSet.Contains(stats.SteamId))
+            bool survived = aliveSet.Contains(stats.SteamId);
+            if (survived)
             {
                 stats.RoundsSurvived++;
             }
@@ -149,6 +157,13 @@ public class StatisticsService
             if (stats.GotKillThisRound)
             {
                 stats.RoundsWithKill++;
+            }
+
+            // União, não soma: um round só conta uma vez para KAST mesmo que o
+            // jogador tenha matado, sobrevivido, assistido e sido vingado ao mesmo tempo.
+            if (stats.GotKillThisRound || survived || stats.GotAssistThisRound || stats.WasTradedThisRound)
+            {
+                stats.RoundsWithKast++;
             }
         }
     }

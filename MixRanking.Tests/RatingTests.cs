@@ -60,6 +60,7 @@ public class RatingTests : IDisposable
             RoundsPlayed = 20,
             RoundsSurvived = 5,
             RoundsWithKill = 10,
+            RoundsWithKast = 15,
             Mvps = 0,
             OpeningKills = 0,
             OpeningDeaths = 0,
@@ -87,7 +88,7 @@ public class RatingTests : IDisposable
         // Base change = 100 * (1 - 0.5) = 50.
         // Performance score for stats:
         // ADR = 1500 / 20 = 75 (adrScore = (75 - 40)/(120 - 40) = 35/80 = 0.4375)
-        // KAST = (10 + 5)/20 = 0.75 (kastScore = (75 - 50)/(90 - 50) = 25/40 = 0.625)
+        // KAST = RoundsWithKast/RoundsPlayed = 15/20 = 0.75 (kastScore = (75 - 50)/(90 - 50) = 25/40 = 0.625)
         // KPR = 15/20 = 0.75 (kprScore = (0.75 - 0.3)/(1.2 - 0.3) = 0.45/0.9 = 0.5)
         // KD = 15/15 = 1.0 (kdScore = (1.0 - 0.5)/(2.0 - 0.5) = 0.5/1.5 = 0.333)
         // MVP = 0 (mvpScore = 0)
@@ -128,6 +129,7 @@ public class RatingTests : IDisposable
             RoundsPlayed = 20,
             RoundsSurvived = 5,
             RoundsWithKill = 10,
+            RoundsWithKast = 15,
             Mvps = 0,
             OpeningKills = 0,
             OpeningDeaths = 0,

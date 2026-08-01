@@ -74,6 +74,7 @@ public class DatabaseTests : IDisposable
             RoundsPlayed = 21,
             RoundsSurvived = 11,
             RoundsWithKill = 12,
+            RoundsWithKast = 21,
             Mvps = 3,
             OpeningKills = 2,
             OpeningDeaths = 1,
@@ -144,7 +145,7 @@ public class DatabaseTests : IDisposable
             Assert.True(await reader.ReadAsync());
             Assert.Equal(20, reader.GetInt32(0));
             Assert.Equal(21, reader.GetInt32(1));
-            // KAST = (12 rounds with kill + 2.5 assists + 11 survived + 3 trade) / 21 = 28.5 / 21 -> capped at 1.0
+            // KAST = RoundsWithKast/RoundsPlayed, capped at 1.0 (every round contributed here)
             Assert.Equal(1.0, reader.GetDouble(2));
             Assert.Equal(0, reader.GetInt32(3));
             Assert.Equal(0, reader.GetInt32(4));

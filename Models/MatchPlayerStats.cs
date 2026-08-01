@@ -53,11 +53,20 @@ public class MatchPlayerStats
     /// <summary>Flash assists.</summary>
     public int FlashAssists { get; set; }
 
+    /// <summary>Rounds em que o jogador teve pelo menos um evento de KAST (Kill, Assist, Survived ou Traded), sem contagem duplicada.</summary>
+    public int RoundsWithKast { get; set; }
+
     /// <summary>Se o jogador estava vivo no início do round atual.</summary>
     public bool WasAliveAtRoundStart { get; set; }
 
     /// <summary>Se o jogador fez kill neste round.</summary>
     public bool GotKillThisRound { get; set; }
+
+    /// <summary>Se o jogador deu assistência neste round.</summary>
+    public bool GotAssistThisRound { get; set; }
+
+    /// <summary>Se a morte do jogador neste round foi vingada por um teammate dentro da janela de trade.</summary>
+    public bool WasTradedThisRound { get; set; }
 
     /// <summary>Se o jogador abandonou a partida.</summary>
     public bool Abandoned { get; set; }
@@ -73,5 +82,7 @@ public class MatchPlayerStats
     {
         WasAliveAtRoundStart = true;
         GotKillThisRound = false;
+        GotAssistThisRound = false;
+        WasTradedThisRound = false;
     }
 }

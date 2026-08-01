@@ -72,18 +72,14 @@ public static class SwingCalculator
 
     /// <summary>
     /// Calcula o percentual de KAST (% de rounds com Kill, Assist, Survived ou Traded).
-    /// Compartilhado entre o cálculo de swing e a persistência de match_player_stats,
-    /// para que uma futura correção do double-counting não precise ser replicada.
+    /// RoundsWithKast já é a contagem de rounds única (sem overlap) — ver StatisticsService.OnRoundEnd.
+    /// Compartilhado entre o cálculo de swing e a persistência de match_player_stats.
     /// </summary>
     public static double CalculateKastPercent(MatchPlayerStats stats)
     {
         if (stats.RoundsPlayed <= 0) return 0.0;
 
-        // KAST = % of rounds with Kill, Assist, Survived, or Traded
-        // Using RoundsWithKill + assists contribution + survived
-        double kastRounds = stats.RoundsWithKill + (stats.Assists * 0.5) + stats.RoundsSurvived + stats.TradeKills;
-        // Avoid double counting: cap at rounds played
-        return Math.Min(kastRounds / stats.RoundsPlayed, 1.0);
+        return Math.Min((double)stats.RoundsWithKast / stats.RoundsPlayed, 1.0);
     }
 
     /// <summary>
