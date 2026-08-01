@@ -479,6 +479,71 @@ public class DatabaseService
         return result != null ? Convert.ToInt32(result) : 1;
     }
 
+    /// <summary>Marca (upsert) o estado atual de um jogador como pendente de sync com a plataforma web.</summary>
+    public async Task UpsertWebSyncQueueAsync(PlayerData player)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = @"
+            INSERT INTO web_sync_queue (steamid, name, rating, matches, wins, losses, kills, deaths, assists, damage, mvps, created_at)
+            VALUES ($steamId, $name, $rating, $matches, $wins, $losses, $kills, $deaths, $assists, $damage, $mvps, $createdAt)
+            ON CONFLICT(steamid) DO UPDATE SET
+                name = $name, rating = $rating, matches = $matches, wins = $wins, losses = $losses,
+                kills = $kills, deaths = $deaths, assists = $assists, damage = $damage, mvps = $mvps,
+                created_at = $createdAt";
+        command.Parameters.AddWithValue("$steamId", player.SteamId);
+        command.Parameters.AddWithValue("$name", player.Name);
+        command.Parameters.AddWithValue("$rating", player.Rating);
+        command.Parameters.AddWithValue("$matches", player.Matches);
+        command.Parameters.AddWithValue("$wins", player.Wins);
+        command.Parameters.AddWithValue("$losses", player.Losses);
+        command.Parameters.AddWithValue("$kills", player.Kills);
+        command.Parameters.AddWithValue("$deaths", player.Deaths);
+        command.Parameters.AddWithValue("$assists", player.Assists);
+        command.Parameters.AddWithValue("$damage", player.Damage);
+        command.Parameters.AddWithValue("$mvps", player.Mvps);
+        command.Parameters.AddWithValue("$createdAt", player.CreatedAt.ToString("o"));
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>Retorna até <paramref name="limit"/> jogadores pendentes de sync com a plataforma web.</summary>
+    public async Task<List<PlayerData>> GetPendingWebSyncEntriesAsync(int limit)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = @"
+            SELECT steamid, name, rating, matches, wins, losses, kills, deaths, assists, damage, mvps, created_at
+            FROM web_sync_queue
+            LIMIT $limit";
+        command.Parameters.AddWithValue("$limit", limit);
+
+        var entries = new List<PlayerData>();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            entries.Add(new PlayerData
+            {
+                SteamId = reader.GetString(0),
+                Name = reader.GetString(1),
+                Rating = reader.GetInt32(2),
+                Matches = reader.GetInt32(3),
+                Wins = reader.GetInt32(4),
+                Losses = reader.GetInt32(5),
+                Kills = reader.GetInt32(6),
+                Deaths = reader.GetInt32(7),
+                Assists = reader.GetInt32(8),
+                Damage = reader.GetInt64(9),
+                Mvps = reader.GetInt32(10),
+                CreatedAt = DateTime.Parse(reader.GetString(11))
+            });
+        }
+        return entries;
+    }
+
     public async Task WriteMatchEndResultAsync(MatchRecord match, List<MatchPlayerUpdate> updates, int initialRating, int activeSeasonId)
     {
         await using var connection = new SqliteConnection(_connectionString);

@@ -320,4 +320,80 @@ public class DatabaseTests : IDisposable
         Assert.Equal("OwnerConsole", reader.GetString(1));
         Assert.Equal("Hard reset", reader.GetString(2));
     }
+
+    [Fact]
+    public async Task UpsertWebSyncQueueAsync_InsertsAndOverwritesBySteamId()
+    {
+        await _db.InitializeAsync();
+
+        var first = new PlayerData
+        {
+            SteamId = "76561198000000010",
+            Name = "SyncPlayer",
+            Rating = 1000,
+            Matches = 1,
+            Wins = 1,
+            Losses = 0,
+            Kills = 10,
+            Deaths = 5,
+            Assists = 2,
+            Damage = 1500,
+            Mvps = 1,
+            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        // Act: insert
+        await _db.UpsertWebSyncQueueAsync(first);
+        var afterFirstInsert = await _db.GetPendingWebSyncEntriesAsync(limit: 10);
+
+        // Assert: one entry with the inserted values
+        Assert.Single(afterFirstInsert);
+        Assert.Equal(1000, afterFirstInsert[0].Rating);
+        Assert.Equal(1, afterFirstInsert[0].Matches);
+
+        // Act: upsert same steamid with updated values
+        var updated = new PlayerData
+        {
+            SteamId = "76561198000000010",
+            Name = "SyncPlayer",
+            Rating = 1050,
+            Matches = 2,
+            Wins = 2,
+            Losses = 0,
+            Kills = 20,
+            Deaths = 8,
+            Assists = 4,
+            Damage = 3000,
+            Mvps = 2,
+            CreatedAt = first.CreatedAt
+        };
+        await _db.UpsertWebSyncQueueAsync(updated);
+        var afterUpsert = await _db.GetPendingWebSyncEntriesAsync(limit: 10);
+
+        // Assert: still only one entry, with the new values (no duplicate row)
+        Assert.Single(afterUpsert);
+        Assert.Equal(1050, afterUpsert[0].Rating);
+        Assert.Equal(2, afterUpsert[0].Matches);
+    }
+
+    [Fact]
+    public async Task GetPendingWebSyncEntriesAsync_RespectsLimit()
+    {
+        await _db.InitializeAsync();
+
+        for (int i = 0; i < 5; i++)
+        {
+            await _db.UpsertWebSyncQueueAsync(new PlayerData
+            {
+                SteamId = $"7656119800000{i:D4}",
+                Name = $"Player{i}",
+                Rating = 1000 + i,
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        var limited = await _db.GetPendingWebSyncEntriesAsync(limit: 3);
+
+        Assert.Equal(3, limited.Count);
+    }
 }
