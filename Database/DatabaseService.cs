@@ -147,6 +147,10 @@ public class DatabaseService
         await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
+        var walCommand = connection.CreateCommand();
+        walCommand.CommandText = "PRAGMA journal_mode=WAL;";
+        await walCommand.ExecuteNonQueryAsync();
+
         int version = await GetUserVersionAsync(connection);
         if (version < 1) { await RunMigrationAsync(connection, Migration1_Baseline); version = 1; await SetUserVersionAsync(connection, version); }
         if (version < 2) { await RunMigrationAsync(connection, Migration2_MatchPlayerStats); version = 2; await SetUserVersionAsync(connection, version); }

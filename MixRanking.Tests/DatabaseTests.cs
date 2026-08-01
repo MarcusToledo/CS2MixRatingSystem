@@ -47,6 +47,33 @@ public class DatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeAsync_EnablesWalJournalMode()
+    {
+        string tempDbPath = Path.Combine(Path.GetTempPath(), $"mixranking_test_{Guid.NewGuid():N}.db");
+        var fileDb = new DatabaseService(tempDbPath);
+
+        try
+        {
+            await fileDb.InitializeAsync();
+
+            await using var connection = new SqliteConnection($"Data Source={tempDbPath}");
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA journal_mode;";
+            var mode = (string)(await command.ExecuteScalarAsync())!;
+
+            Assert.Equal("wal", mode, ignoreCase: true);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            File.Delete(tempDbPath);
+            if (File.Exists(tempDbPath + "-wal")) File.Delete(tempDbPath + "-wal");
+            if (File.Exists(tempDbPath + "-shm")) File.Delete(tempDbPath + "-shm");
+        }
+    }
+
+    [Fact]
     public async Task WriteMatchEndResultAsync_SavesSuccessfullyInSingleTransaction()
     {
         await _db.InitializeAsync();
