@@ -973,6 +973,8 @@ public class DatabaseService
                     DELETE FROM season_ratings;
                     DELETE FROM matches;
                     DELETE FROM players;
+                    DELETE FROM web_sync_queue;
+                    UPDATE web_sync_state SET wipe_pending = 1 WHERE id = 1;
                 ";
                 await deleteCmd.ExecuteNonQueryAsync();
 

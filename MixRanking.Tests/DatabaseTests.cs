@@ -299,6 +299,7 @@ public class DatabaseTests : IDisposable
     {
         await _db.InitializeAsync();
         await _db.GetOrCreatePlayerAsync("76561198000000003", "WipeTarget", 1000);
+        await _db.UpsertWebSyncQueueAsync(new PlayerData { SteamId = "76561198000000003", Name = "WipeTarget", Rating = 1000, CreatedAt = DateTime.UtcNow });
 
         // Act
         await _db.ResetAllDataWithAuditAsync("76561198000000000", "OwnerConsole", "Hard reset");
@@ -319,6 +320,10 @@ public class DatabaseTests : IDisposable
         Assert.Equal("WIPE", reader.GetString(0));
         Assert.Equal("OwnerConsole", reader.GetString(1));
         Assert.Equal("Hard reset", reader.GetString(2));
+
+        // Web sync: fila limpa e wipe sinalizado para o próximo ciclo de drenagem
+        Assert.Empty(await _db.GetPendingWebSyncEntriesAsync(limit: 10));
+        Assert.True(await _db.IsWipePendingAsync());
     }
 
     [Fact]
