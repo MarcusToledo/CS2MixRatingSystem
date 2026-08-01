@@ -40,6 +40,9 @@ public class StatsCommand
             try
             {
                 var playerData = await _playerService.GetPlayerAsync(steamId);
+                int totalRounds = playerData != null && playerData.Matches > 0
+                    ? await _playerService.GetTotalRoundsPlayedAsync(steamId)
+                    : 0;
 
                 Server.NextFrame(() =>
                 {
@@ -54,9 +57,7 @@ public class StatsCommand
 
                     double kd = playerData.Deaths > 0 ? (double)playerData.Kills / playerData.Deaths : playerData.Kills;
                     double winrate = playerData.Matches > 0 ? (double)playerData.Wins / playerData.Matches * 100 : 0;
-                    // Approximate total rounds (average 24 rounds per match)
-                    long estimatedRounds = playerData.Matches * 24L;
-                    double adr = estimatedRounds > 0 ? (double)playerData.Damage / estimatedRounds : 0;
+                    double adr = totalRounds > 0 ? (double)playerData.Damage / totalRounds : 0;
 
                     targetPlayer.PrintToChat($" {ChatColors.Gold}📊 ══════════ Estatísticas ══════════ 📊");
                     targetPlayer.PrintToChat($" {ChatColors.Gold}👤 {ChatColors.Default}Jogador: {ChatColors.Green}{playerData.Name} {ChatColors.Grey}│ {ChatColors.Default}Rating: {ChatColors.Yellow}{playerData.Rating}");

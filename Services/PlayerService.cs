@@ -35,6 +35,10 @@ public class PlayerService
     public Task<int> GetTotalRankedPlayersAsync()
         => _db.GetTotalRankedPlayersAsync();
 
+    /// <summary>Retorna o total de rounds jogados acumulados de um jogador (soma de match_player_stats).</summary>
+    public Task<int> GetTotalRoundsPlayedAsync(string steamId)
+        => _db.GetPlayerTotalRoundsPlayedAsync(steamId);
+
     /// <summary>Retorna o histórico de rating de um jogador.</summary>
     public Task<List<RatingChange>> GetRatingHistoryAsync(string steamId, int count = 10)
         => _db.GetRatingHistoryAsync(steamId, count);

@@ -161,6 +161,75 @@ public class DatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task GetPlayerTotalRoundsPlayedAsync_SumsRoundsAcrossMatches()
+    {
+        await _db.InitializeAsync();
+        int activeSeasonId = await _db.GetActiveSeasonIdAsync();
+
+        async Task WriteMatch(int roundsPlayed)
+        {
+            var match = new MatchRecord
+            {
+                MatchGuid = Guid.NewGuid().ToString(),
+                Map = "de_inferno",
+                WinnerTeam = 3,
+                CtScore = 13,
+                TScore = 5,
+                FinishedAt = DateTime.UtcNow
+            };
+
+            var stats = new MatchPlayerStats
+            {
+                SteamId = 76561198000000050,
+                PlayerName = "RoundsPlayer",
+                Team = CsTeam.CounterTerrorist,
+                Kills = 10,
+                Deaths = 10,
+                Damage = 1000,
+                RoundsPlayed = roundsPlayed,
+                RoundsSurvived = 5,
+                RoundsWithKill = 5,
+                Abandoned = false
+            };
+
+            var playerData = new PlayerData { SteamId = "76561198000000050", Name = "RoundsPlayer", Rating = 1000, Matches = 0 };
+            var ratingChange = new RatingChange
+            {
+                SteamId = "76561198000000050",
+                OldRating = 1000,
+                BaseChange = 10,
+                PerformanceSwing = 0,
+                TotalChange = 10,
+                NewRating = 1010,
+                PlayerName = "RoundsPlayer",
+                Won = true,
+                KFactorUsed = 50
+            };
+
+            var update = new MatchPlayerUpdate { Stats = stats, PlayerData = playerData, RatingChange = ratingChange, NewRating = 1010, Won = true };
+            await _db.WriteMatchEndResultAsync(match, new List<MatchPlayerUpdate> { update }, 1000, activeSeasonId);
+        }
+
+        // Act
+        await WriteMatch(roundsPlayed: 21);
+        await WriteMatch(roundsPlayed: 16);
+
+        // Assert
+        int totalRounds = await _db.GetPlayerTotalRoundsPlayedAsync("76561198000000050");
+        Assert.Equal(37, totalRounds);
+    }
+
+    [Fact]
+    public async Task GetPlayerTotalRoundsPlayedAsync_ReturnsZero_WhenPlayerHasNoMatches()
+    {
+        await _db.InitializeAsync();
+
+        int totalRounds = await _db.GetPlayerTotalRoundsPlayedAsync("76561198099999999");
+
+        Assert.Equal(0, totalRounds);
+    }
+
+    [Fact]
     public async Task SetPlayerRatingWithAuditAsync_SavesAuditLogSuccessfully()
     {
         await _db.InitializeAsync();

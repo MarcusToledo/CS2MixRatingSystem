@@ -40,11 +40,13 @@ public class RankCommand
                 var playerData = await _playerService.GetPlayerAsync(steamId);
                 int rankPosition = 0;
                 int totalPlayers = 0;
+                int totalRounds = 0;
 
                 if (playerData != null && playerData.Matches > 0)
                 {
                     rankPosition = await _playerService.GetRankPositionAsync(steamId);
                     totalPlayers = await _playerService.GetTotalRankedPlayersAsync();
+                    totalRounds = await _playerService.GetTotalRoundsPlayedAsync(steamId);
                 }
 
                 Server.NextFrame(() =>
@@ -59,7 +61,7 @@ public class RankCommand
                     }
 
                     double kd = playerData.Deaths > 0 ? (double)playerData.Kills / playerData.Deaths : playerData.Kills;
-                    double adr = playerData.Matches > 0 ? (double)playerData.Damage / (playerData.Matches * 24) : 0; // Approximate 24 rounds per match
+                    double adr = totalRounds > 0 ? (double)playerData.Damage / totalRounds : 0;
                     double winrate = playerData.Matches > 0 ? (double)playerData.Wins / playerData.Matches * 100 : 0;
 
                     targetPlayer.PrintToChat($" {ChatColors.Gold}★ ════════════════════════════════════════ ★");

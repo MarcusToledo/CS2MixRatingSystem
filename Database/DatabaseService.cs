@@ -397,6 +397,20 @@ public class DatabaseService
         return Convert.ToInt32(result);
     }
 
+    /// <summary>Retorna o total de rounds jogados acumulados de um jogador, somando todas as partidas registradas.</summary>
+    public async Task<int> GetPlayerTotalRoundsPlayedAsync(string steamId)
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT COALESCE(SUM(rounds_played), 0) FROM match_player_stats WHERE steamid = $steamId";
+        command.Parameters.AddWithValue("$steamId", steamId);
+
+        var result = await command.ExecuteScalarAsync();
+        return Convert.ToInt32(result);
+    }
+
     public async Task<Dictionary<string, PlayerData>> GetPlayersBySteamIdsAsync(List<string> steamIds)
     {
         var players = new Dictionary<string, PlayerData>();
