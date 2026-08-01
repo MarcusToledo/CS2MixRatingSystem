@@ -44,4 +44,20 @@ public class RankingConfig : BasePluginConfig
     /// <summary>Prefixo utilizado nas mensagens do chat.</summary>
     [JsonPropertyName("ChatPrefix")]
     public string ChatPrefix { get; set; } = "GurizadaMix";
+
+    /// <summary>Habilita o sync outbound de rating/nível com a plataforma web.</summary>
+    [JsonPropertyName("WebSyncEnabled")]
+    public bool WebSyncEnabled { get; set; } = false;
+
+    /// <summary>URL HTTPS de destino do sync outbound.</summary>
+    [JsonPropertyName("WebSyncUrl")]
+    public string WebSyncUrl { get; set; } = "";
+
+    /// <summary>Chave de API enviada no header Authorization do sync outbound.</summary>
+    [JsonPropertyName("WebSyncApiKey")]
+    public string WebSyncApiKey { get; set; } = "";
+
+    /// <summary>Intervalo em segundos entre drenagens da fila de sync outbound.</summary>
+    [JsonPropertyName("WebSyncIntervalSeconds")]
+    public int WebSyncIntervalSeconds { get; set; } = 30;
 }
