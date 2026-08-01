@@ -45,18 +45,15 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
         string dbPath = Path.Combine(ModuleDirectory, "mixranking.db");
         _database = new DatabaseService(dbPath);
 
-        Task.Run(async () =>
+        try
         {
-            try
-            {
-                await _database.InitializeAsync();
-                Logger.LogInformation("[MixRanking] Database initialized at {Path}", dbPath);
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "[MixRanking] Failed to initialize database!");
-            }
-        }).Wait();
+            _database.InitializeAsync().GetAwaiter().GetResult();
+            Logger.LogInformation("[MixRanking] Database initialized at {Path}", dbPath);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "[MixRanking] Failed to initialize database!");
+        }
 
         // 2. Initialize services
         _statistics = new StatisticsService();
