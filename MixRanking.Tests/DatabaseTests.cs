@@ -429,4 +429,18 @@ public class DatabaseTests : IDisposable
         Assert.Single(remaining);
         Assert.Equal("76561198000000023", remaining[0].SteamId);
     }
+
+    [Fact]
+    public async Task WipePendingState_DefaultsFalseThenTogglesCorrectly()
+    {
+        await _db.InitializeAsync();
+
+        Assert.False(await _db.IsWipePendingAsync());
+
+        await _db.SetWipePendingAsync();
+        Assert.True(await _db.IsWipePendingAsync());
+
+        await _db.ClearWipePendingAsync();
+        Assert.False(await _db.IsWipePendingAsync());
+    }
 }

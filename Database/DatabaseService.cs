@@ -564,6 +564,40 @@ public class DatabaseService
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Indica se um !rating_wipe está pendente de sinalização à plataforma web.</summary>
+    public async Task<bool> IsWipePendingAsync()
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT wipe_pending FROM web_sync_state WHERE id = 1";
+        var result = await command.ExecuteScalarAsync();
+        return result != null && Convert.ToInt32(result) == 1;
+    }
+
+    /// <summary>Marca que um wipe precisa ser sinalizado à plataforma web no próximo ciclo de sync.</summary>
+    public async Task SetWipePendingAsync()
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE web_sync_state SET wipe_pending = 1 WHERE id = 1";
+        await command.ExecuteNonQueryAsync();
+    }
+
+    /// <summary>Limpa a sinalização de wipe pendente após envio bem-sucedido.</summary>
+    public async Task ClearWipePendingAsync()
+    {
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "UPDATE web_sync_state SET wipe_pending = 0 WHERE id = 1";
+        await command.ExecuteNonQueryAsync();
+    }
+
     public async Task WriteMatchEndResultAsync(MatchRecord match, List<MatchPlayerUpdate> updates, int initialRating, int activeSeasonId)
     {
         await using var connection = new SqliteConnection(_connectionString);
