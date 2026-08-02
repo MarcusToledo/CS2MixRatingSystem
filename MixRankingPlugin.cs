@@ -80,7 +80,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
         var statsCommand = new StatsCommand(_playerService, Config);
         statsCommand.Register(this);
 
-        var adminCommands = new AdminCommands(_database, Config);
+        var adminCommands = new AdminCommands(_database, Config, _webSyncService);
         adminCommands.Register(this);
 
         // 5. Initialize match on load (for hot reload support)

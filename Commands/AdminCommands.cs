@@ -5,6 +5,7 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Utils;
 using MixRanking.Config;
 using MixRanking.Database;
+using MixRanking.Services;
 
 namespace MixRanking.Commands;
 
@@ -13,11 +14,23 @@ public class AdminCommands
 {
     private readonly DatabaseService _db;
     private readonly RankingConfig _config;
+    private readonly WebSyncService _webSyncService;
 
-    public AdminCommands(DatabaseService db, RankingConfig config)
+    public AdminCommands(DatabaseService db, RankingConfig config, WebSyncService webSyncService)
     {
         _db = db;
         _config = config;
+        _webSyncService = webSyncService;
+    }
+
+    /// <summary>Busca o estado atual do jogador após uma alteração de rating e marca para sync com a plataforma web.</summary>
+    private async Task MarkPlayerDirtyForWebSyncAsync(string steamId)
+    {
+        var updatedPlayer = await _db.GetPlayerAsync(steamId);
+        if (updatedPlayer != null)
+        {
+            await _webSyncService.MarkDirtyAsync(updatedPlayer);
+        }
     }
 
     /// <summary>Registra os comandos admin no plugin.</summary>
@@ -76,6 +89,7 @@ public class AdminCommands
                 }
 
                 await _db.SetPlayerRatingWithAuditAsync(targetSteamId, newRating, adminSteamId, adminName, reason);
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 PrintToPlayer(slot, $"{ChatColors.Green}Rating de {targetPlayer.Name} setado para {newRating}.");
             }
             catch (Exception ex)
@@ -125,6 +139,7 @@ public class AdminCommands
                 }
 
                 await _db.ResetPlayerWithAuditAsync(targetSteamId, _config.InitialRating, adminSteamId, adminName, reason);
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 PrintToPlayer(slot, $"{ChatColors.Green}Jogador {targetPlayer.Name} resetado para {_config.InitialRating}.");
             }
             catch (Exception ex)
@@ -180,6 +195,7 @@ public class AdminCommands
                 }
 
                 await _db.AdjustPlayerRatingWithAuditAsync(targetSteamId, amount, isAdd: true, minRating: _config.MinRating, adminSteamId: adminSteamId, adminName: adminName, reason: reason);
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 int newRating = targetPlayer.Rating + amount;
                 PrintToPlayer(slot, $"{ChatColors.Green}+{amount} rating para {targetPlayer.Name}. Novo: {newRating}.");
             }
@@ -236,6 +252,7 @@ public class AdminCommands
                 }
 
                 await _db.AdjustPlayerRatingWithAuditAsync(targetSteamId, amount, isAdd: false, minRating: _config.MinRating, adminSteamId: adminSteamId, adminName: adminName, reason: reason);
+                await MarkPlayerDirtyForWebSyncAsync(targetSteamId);
                 int newRating = Math.Max(targetPlayer.Rating - amount, _config.MinRating);
                 PrintToPlayer(slot, $"{ChatColors.Green}-{amount} rating de {targetPlayer.Name}. Novo: {newRating}.");
             }
