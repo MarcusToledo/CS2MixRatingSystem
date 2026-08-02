@@ -1,9 +1,16 @@
 # CS2 Mix Rating System - Web Integration Contract
 
-**Document Version:** 1.0.0 (aligned with database version 4)  
-**Target Database Version:** `PRAGMA user_version = 4`
+**Document Version:** 1.1.0 (schema SQLite abaixo alinhado à versão 4; o banco está agora na versão 5, mas as tabelas novas são detalhe interno — ver seção 4)  
+**Target Database Version:** `PRAGMA user_version = 4` (apenas para a seção 2; ver seção 4 para o caminho ativo de integração)
 
 This document details the database schema and data format contract between the CS2 server plugin and the external web platform.
+
+> [!NOTE]
+> **Status da integração:** o caminho de leitura direta do SQLite descrito na seção 2 é
+> mantido como referência de schema, mas **não é mais o mecanismo ativo de integração**
+> — a topologia de produção (servidor de jogo e plataforma web em máquinas diferentes,
+> sem filesystem compartilhado) o inviabiliza. A integração ativa é o sync HTTP outbound
+> descrito na seção 4.
 
 ---
 
@@ -126,3 +133,67 @@ Values normally written by the current plugin use:
 - SQLite-generated timestamps: UTC format such as `"2026-07-31 18:01:10"`.
 
 The web backend must accept both formats and interpret SQLite `datetime('now')` values as UTC, not as server-local time.
+
+---
+
+## 4. Outbound Web Sync (HTTP) — Rating e Nível
+
+> [!IMPORTANT]
+> **Este é o mecanismo ativo de integração.** A seção 2 (schema SQLite) é mantida como
+> referência, mas a plataforma web não tem acesso direto ao arquivo do banco.
+
+O plugin envia periodicamente, via `POST` HTTPS de saída, o estado atual de
+rating/desempenho dos jogadores marcados como alterados desde o último envio. Cada
+envio representa o **estado atual**, não um evento — reenviar um lote já processado é
+sempre seguro (idempotente).
+
+### Endpoint
+
+- Método: `POST`
+- URL: configurável no plugin (`WebSyncUrl`), deve ser `https://`.
+- Autenticação: header `Authorization: Bearer <WebSyncApiKey>`.
+- Timeout do lado do plugin: 5 segundos.
+
+### Payload — lote de jogadores
+
+```json
+{
+  "players": [
+    {
+      "steamid": "76561198000000000",
+      "name": "player_name",
+      "rating": 1234,
+      "matches": 42,
+      "wins": 25,
+      "losses": 17,
+      "kills": 512,
+      "deaths": 430,
+      "assists": 88,
+      "damage": 98765,
+      "mvps": 12,
+      "created_at": "2026-01-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Payload — sinal de wipe
+
+Quando `!rating_wipe` é executado no servidor, o próximo envio é este payload isolado,
+em vez do lote normal:
+
+```json
+{ "wipe": true }
+```
+
+A plataforma deve tratar `{"wipe": true}` como instrução para apagar todos os
+registros de rating/nível que mantém para este servidor.
+
+### Contrato de resposta
+
+- `200 OK` = lote inteiro (ou sinal de wipe) aceito. Sem semântica de aceitação
+  parcial por item.
+- Qualquer outro status = tratado como falha inteira; o plugin reenvia integralmente
+  no próximo ciclo (sem backoff exponencial — intervalo fixo do timer).
+- A plataforma pode sobrescrever seus registros pelo `steamid` sem necessidade de
+  deduplicação ou controle de sequência — o remetente garante idempotência.
