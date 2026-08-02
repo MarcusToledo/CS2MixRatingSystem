@@ -538,7 +538,7 @@ public class DatabaseService
                 Assists = reader.GetInt32(8),
                 Damage = reader.GetInt64(9),
                 Mvps = reader.GetInt32(10),
-                CreatedAt = DateTime.Parse(reader.GetString(11))
+                CreatedAt = DateTime.Parse(reader.GetString(11), null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
             });
         }
         return entries;
@@ -1007,8 +1007,8 @@ public class DatabaseService
             Assists = reader.GetInt32(8),
             Damage = reader.GetInt64(9),
             Mvps = reader.GetInt32(10),
-            CreatedAt = DateTime.Parse(reader.GetString(11)),
-            UpdatedAt = DateTime.Parse(reader.GetString(12))
+            CreatedAt = DateTime.Parse(reader.GetString(11), null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal),
+            UpdatedAt = DateTime.Parse(reader.GetString(12), null, System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal)
         };
     }
 }

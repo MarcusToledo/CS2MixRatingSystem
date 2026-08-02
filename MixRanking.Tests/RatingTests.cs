@@ -36,7 +36,7 @@ public class RatingTests : IDisposable
         };
 
         _webSyncService = new WebSyncService(_db, new FakeWebSyncClient(), NullLogger.Instance);
-        _ratingService = new RatingService(_db, _config, _webSyncService);
+        _ratingService = new RatingService(_db, _config, _webSyncService, NullLogger.Instance);
     }
 
     public void Dispose()

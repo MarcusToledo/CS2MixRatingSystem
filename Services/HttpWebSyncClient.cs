@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using MixRanking.Config;
 using MixRanking.Models;
 
@@ -11,10 +12,12 @@ public class HttpWebSyncClient : IWebSyncClient, IDisposable
 {
     private readonly HttpClient _httpClient;
     private readonly RankingConfig _config;
+    private readonly ILogger _logger;
 
-    public HttpWebSyncClient(RankingConfig config)
+    public HttpWebSyncClient(RankingConfig config, ILogger logger)
     {
         _config = config;
+        _logger = logger;
         _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
     }
 
@@ -57,10 +60,16 @@ public class HttpWebSyncClient : IWebSyncClient, IDisposable
             request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
             using var response = await _httpClient.SendAsync(request);
-            return response.IsSuccessStatusCode;
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("[MixRanking] Web sync HTTP request failed with status {StatusCode}.", (int)response.StatusCode);
+                return false;
+            }
+            return true;
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            _logger.LogWarning("[MixRanking] Web sync HTTP request threw {ExceptionType}: {Message}", ex.GetType().Name, ex.Message);
             return false;
         }
     }

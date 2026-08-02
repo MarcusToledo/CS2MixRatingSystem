@@ -61,9 +61,9 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
 
         // 2. Initialize services
         _statistics = new StatisticsService();
-        _webSyncClient = new HttpWebSyncClient(Config);
+        _webSyncClient = new HttpWebSyncClient(Config, Logger);
         _webSyncService = new WebSyncService(_database, _webSyncClient, Logger);
-        _ratingService = new RatingService(_database, Config, _webSyncService);
+        _ratingService = new RatingService(_database, Config, _webSyncService, Logger);
         _playerService = new PlayerService(_database, Config.InitialRating);
         _matchService = new MatchService(_statistics, _ratingService, Config, Logger);
 
@@ -105,7 +105,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
 
     public override void Unload(bool hotReload)
     {
-        _webSyncClient.Dispose();
+        _webSyncClient?.Dispose();
         Logger.LogInformation("[MixRanking] Plugin unloaded.");
     }
 }

@@ -1,4 +1,5 @@
 using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.Logging;
 using MixRanking.Config;
 using MixRanking.Database;
 using MixRanking.Models;
@@ -15,12 +16,14 @@ public class RatingService
     private readonly DatabaseService _db;
     private readonly RankingConfig _config;
     private readonly WebSyncService _webSyncService;
+    private readonly ILogger _logger;
 
-    public RatingService(DatabaseService db, RankingConfig config, WebSyncService webSyncService)
+    public RatingService(DatabaseService db, RankingConfig config, WebSyncService webSyncService, ILogger logger)
     {
         _db = db;
         _config = config;
         _webSyncService = webSyncService;
+        _logger = logger;
     }
 
     /// <summary>
@@ -150,11 +153,20 @@ public class RatingService
 
         await _db.WriteMatchEndResultAsync(matchRecord, playerUpdates, _config.InitialRating, activeSeasonId);
 
-        var updatedSteamIds = playerUpdates.Select(u => u.PlayerData.SteamId).ToList();
-        var freshPlayers = await _db.GetPlayersBySteamIdsAsync(updatedSteamIds);
-        foreach (var freshPlayer in freshPlayers.Values)
+        // 5. Web sync dirty-marking: aditivo, não crítico — falhas aqui nunca podem
+        // impedir a devolução dos ratingChanges (o rating já foi persistido acima).
+        try
         {
-            await _webSyncService.MarkDirtyAsync(freshPlayer);
+            var updatedSteamIds = playerUpdates.Select(u => u.PlayerData.SteamId).ToList();
+            var freshPlayers = await _db.GetPlayersBySteamIdsAsync(updatedSteamIds);
+            foreach (var freshPlayer in freshPlayers.Values)
+            {
+                await _webSyncService.MarkDirtyAsync(freshPlayer);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[MixRanking] Failed to mark players for web sync after match {MatchGuid}.", matchGuid);
         }
 
         return ratingChanges;
