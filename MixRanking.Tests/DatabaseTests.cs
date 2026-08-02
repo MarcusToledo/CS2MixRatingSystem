@@ -55,6 +55,68 @@ public class DatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task InitializeAsync_MigratesExistingDataWhenForeignKeysAreEnforced()
+    {
+        // Reproduces a live server upgrading from schema v2: real match rows already
+        // exist, and the SQLite build in that environment enforces PRAGMA foreign_keys.
+        // SQLite refuses ALTER TABLE ... ADD COLUMN ... REFERENCES ... with a non-NULL
+        // default once the target table is non-empty and foreign keys are enforced.
+        string dbName = $"FkMigration_{Guid.NewGuid():N};Mode=Memory;Cache=Shared;Foreign Keys=True";
+        await using var keepAlive = new SqliteConnection($"Data Source={dbName}");
+        await keepAlive.OpenAsync();
+
+        await using (var seedCommand = keepAlive.CreateCommand())
+        {
+            seedCommand.CommandText = @"
+                CREATE TABLE matches (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    match_guid TEXT NOT NULL,
+                    map TEXT NOT NULL DEFAULT '',
+                    winner_team INTEGER NOT NULL DEFAULT 0,
+                    ct_score INTEGER NOT NULL DEFAULT 0,
+                    t_score INTEGER NOT NULL DEFAULT 0,
+                    finished_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+                CREATE TABLE rating_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    match_id INTEGER NOT NULL,
+                    steamid TEXT NOT NULL,
+                    old_rating INTEGER NOT NULL,
+                    base_change INTEGER NOT NULL,
+                    performance_swing INTEGER NOT NULL,
+                    total_change INTEGER NOT NULL,
+                    new_rating INTEGER NOT NULL
+                );
+                CREATE TABLE match_player_stats (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    match_id INTEGER NOT NULL,
+                    steamid TEXT NOT NULL,
+                    team INTEGER NOT NULL
+                );
+                INSERT INTO matches (match_guid) VALUES ('existing-match-from-before-seasons');
+                INSERT INTO rating_history (match_id, steamid, old_rating, base_change, performance_swing, total_change, new_rating)
+                    VALUES (1, '76561198000000001', 1000, 10, 2, 12, 1012);
+                INSERT INTO match_player_stats (match_id, steamid, team) VALUES (1, '76561198000000001', 3);
+                PRAGMA user_version = 2;
+            ";
+            await seedCommand.ExecuteNonQueryAsync();
+        }
+
+        var db = new DatabaseService(dbName);
+
+        // Act
+        await db.InitializeAsync();
+
+        // Assert
+        await using var command = keepAlive.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        Assert.Equal(5, Convert.ToInt32(await command.ExecuteScalarAsync()));
+
+        command.CommandText = "SELECT season_id FROM matches WHERE match_guid = 'existing-match-from-before-seasons';";
+        Assert.Equal(1, Convert.ToInt32(await command.ExecuteScalarAsync()));
+    }
+
+    [Fact]
     public async Task InitializeAsync_EnablesWalJournalMode()
     {
         string tempDbPath = Path.Combine(Path.GetTempPath(), $"mixranking_test_{Guid.NewGuid():N}.db");

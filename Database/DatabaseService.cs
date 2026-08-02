@@ -119,10 +119,10 @@ public class DatabaseService
 
         INSERT INTO seasons (name, is_active) VALUES ('Season 1', 1);
 
-        ALTER TABLE matches ADD COLUMN season_id INTEGER NOT NULL DEFAULT 1 REFERENCES seasons(id);
-        ALTER TABLE rating_history ADD COLUMN season_id INTEGER NOT NULL DEFAULT 1 REFERENCES seasons(id);
+        ALTER TABLE matches ADD COLUMN season_id INTEGER NOT NULL DEFAULT 1;
+        ALTER TABLE rating_history ADD COLUMN season_id INTEGER NOT NULL DEFAULT 1;
         ALTER TABLE rating_history ADD COLUMN k_factor_used INTEGER;
-        ALTER TABLE match_player_stats ADD COLUMN season_id INTEGER NOT NULL DEFAULT 1 REFERENCES seasons(id);
+        ALTER TABLE match_player_stats ADD COLUMN season_id INTEGER NOT NULL DEFAULT 1;
     ";
 
     private const string Migration4_AdminAuditLog = @"
