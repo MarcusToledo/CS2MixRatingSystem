@@ -19,9 +19,6 @@ public class MatchEvents
     private readonly ILogger _logger;
     private readonly RankingConfig _config;
 
-    /// <summary>Controle de rounds para detecção de warmup.</summary>
-    private bool _matchStartDetected;
-
     public MatchEvents(MatchService matchService, StatisticsService statistics, RankingConfig config, ILogger logger)
     {
         _matchService = matchService;
@@ -35,6 +32,7 @@ public class MatchEvents
     {
         plugin.RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
         plugin.RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
+        plugin.RegisterEventHandler<EventRoundAnnounceMatchStart>(OnRoundAnnounceMatchStart);
         plugin.RegisterEventHandler<EventRoundStart>(OnRoundStart);
         plugin.RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
         plugin.RegisterEventHandler<EventRoundMvp>(OnRoundMvp);
@@ -113,36 +111,41 @@ public class MatchEvents
         return HookResult.Continue;
     }
 
+    private HookResult OnRoundAnnounceMatchStart(EventRoundAnnounceMatchStart @event, GameEventInfo info)
+    {
+        // Disparado quando a partida realmente vai ao vivo (pós warmup/faca).
+        // Diferente de EventRoundStart, que também dispara durante o warmup —
+        // usá-lo aqui evitava que a contagem inicial de jogadores fosse tirada
+        // antes dos times serem definidos, zerando InitialCtCount/InitialTCount.
+        if (_matchService.IsLive) return HookResult.Continue;
+
+        var players = Utilities.GetPlayers();
+        int ctCount = 0, tCount = 0;
+
+        foreach (var player in players)
+        {
+            if (player.IsValid && !player.IsBot && !player.IsHLTV)
+            {
+                var team = (CsTeam)player.TeamNum;
+                if (team == CsTeam.CounterTerrorist) ctCount++;
+                else if (team == CsTeam.Terrorist) tCount++;
+
+                // Initialize stats for all players
+                _statistics.GetOrCreateStats(player.SteamID, player.PlayerName, team);
+            }
+        }
+
+        _matchService.SetLive(ctCount, tCount);
+
+        return HookResult.Continue;
+    }
+
     private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
     {
-        if (!_matchStartDetected)
-        {
-            // First real round — detect initial player counts and go live
-            var players = Utilities.GetPlayers();
-            int ctCount = 0, tCount = 0;
+        if (!_matchService.IsLive) return HookResult.Continue;
 
-            foreach (var player in players)
-            {
-                if (player.IsValid && !player.IsBot && !player.IsHLTV)
-                {
-                    var team = (CsTeam)player.TeamNum;
-                    if (team == CsTeam.CounterTerrorist) ctCount++;
-                    else if (team == CsTeam.Terrorist) tCount++;
-
-                    // Initialize stats for all players
-                    _statistics.GetOrCreateStats(player.SteamID, player.PlayerName, team);
-                }
-            }
-
-            _matchService.SetLive(ctCount, tCount);
-            _matchStartDetected = true;
-        }
-
-        if (_matchService.IsLive)
-        {
-            _matchService.OnRoundStart();
-            _statistics.OnRoundStart();
-        }
+        _matchService.OnRoundStart();
+        _statistics.OnRoundStart();
 
         return HookResult.Continue;
     }
@@ -272,11 +275,7 @@ public class MatchEvents
             }
             finally
             {
-                Server.NextFrame(() =>
-                {
-                    _matchService.Reset();
-                    _matchStartDetected = false;
-                });
+                Server.NextFrame(() => _matchService.Reset());
             }
         });
 
