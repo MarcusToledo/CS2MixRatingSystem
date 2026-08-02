@@ -1,5 +1,6 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Logging;
 using MixRanking.Commands;
 using MixRanking.Config;
@@ -86,6 +87,17 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
         // 5. Initialize match on load (for hot reload support)
         _matchService.StartMatch();
 
+        // 6. Web sync timer (push outbound para a plataforma web)
+        if (Config.WebSyncEnabled && Config.WebSyncUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            AddTimer(Config.WebSyncIntervalSeconds, () => { _ = _webSyncService.DrainPendingAsync(); }, TimerFlags.REPEAT);
+            Logger.LogInformation("[MixRanking] Web sync enabled — interval: {Interval}s", Config.WebSyncIntervalSeconds);
+        }
+        else
+        {
+            Logger.LogInformation("[MixRanking] Web sync disabled.");
+        }
+
         Logger.LogInformation("[MixRanking] Plugin loaded successfully!");
         Logger.LogInformation("[MixRanking] Commands: !rank, !top, !stats, !lastmatch, !profile");
         Logger.LogInformation("[MixRanking] Admin: !rating_set, !rating_reset, !rating_add, !rating_remove");
@@ -93,6 +105,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
 
     public override void Unload(bool hotReload)
     {
+        _webSyncClient.Dispose();
         Logger.LogInformation("[MixRanking] Plugin unloaded.");
     }
 }
