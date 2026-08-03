@@ -33,6 +33,14 @@ public class RankingConfig : BasePluginConfig
     [JsonPropertyName("MinRating")]
     public int MinRating { get; set; } = 100;
 
+    /// <summary>URL base do projeto Supabase dedicado ao plugin (ex: https://xxxx.supabase.co).</summary>
+    [JsonPropertyName("SupabaseUrl")]
+    public string SupabaseUrl { get; set; } = "";
+
+    /// <summary>Service role key do projeto Supabase, enviada nos headers apikey/Authorization.</summary>
+    [JsonPropertyName("SupabaseServiceKey")]
+    public string SupabaseServiceKey { get; set; } = "";
+
     /// <summary>Número de partidas de placement.</summary>
     [JsonPropertyName("PlacementMatchCount")]
     public int PlacementMatchCount { get; set; } = 10;
