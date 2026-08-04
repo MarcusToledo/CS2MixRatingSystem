@@ -21,11 +21,23 @@ internal class FakeHttpMessageHandler : HttpMessageHandler
         // correctly disposes each HttpResponseMessage it receives (`using var response = ...`),
         // which would otherwise dispose ResponseToReturn.Content and break any test — like
         // GetOrCreatePlayerAsync — that issues more than one request against the same handler.
-        string? responseBody = ResponseToReturn.Content != null ? await ResponseToReturn.Content.ReadAsStringAsync(cancellationToken) : null;
+        // The clone copies both response-level headers and content-level headers (e.g.
+        // Content-Range) from ResponseToReturn, so tests that configure those headers (see
+        // GetTotalRankedPlayersAsync, which reads Content-Range) are faithfully reproduced
+        // rather than silently stripped.
         var clonedResponse = new HttpResponseMessage(ResponseToReturn.StatusCode);
-        if (responseBody != null)
+        foreach (var header in ResponseToReturn.Headers)
         {
-            clonedResponse.Content = new StringContent(responseBody, Encoding.UTF8, "application/json");
+            clonedResponse.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+        if (ResponseToReturn.Content != null)
+        {
+            byte[] bodyBytes = await ResponseToReturn.Content.ReadAsByteArrayAsync(cancellationToken);
+            clonedResponse.Content = new ByteArrayContent(bodyBytes);
+            foreach (var header in ResponseToReturn.Content.Headers)
+            {
+                clonedResponse.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
         }
         return clonedResponse;
     }
