@@ -5,7 +5,7 @@ using MixRanking.Rating;
 namespace MixRanking.Database;
 
 /// <summary>Serviço de persistência SQLite. Nenhuma regra de negócio aqui.</summary>
-public class DatabaseService
+public class DatabaseService : IDatabaseService
 {
     private readonly string _connectionString;
 

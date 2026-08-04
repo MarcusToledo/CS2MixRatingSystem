@@ -6,10 +6,10 @@ namespace MixRanking.Services;
 /// <summary>Interface entre o plugin e o banco para operações de jogador.</summary>
 public class PlayerService
 {
-    private readonly DatabaseService _db;
+    private readonly IDatabaseService _db;
     private readonly int _initialRating;
 
-    public PlayerService(DatabaseService db, int initialRating)
+    public PlayerService(IDatabaseService db, int initialRating)
     {
         _db = db;
         _initialRating = initialRating;

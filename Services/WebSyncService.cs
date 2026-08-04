@@ -12,11 +12,11 @@ public class WebSyncService
 {
     private const int BatchLimit = 100;
 
-    private readonly DatabaseService _db;
+    private readonly IDatabaseService _db;
     private readonly IWebSyncClient _client;
     private readonly ILogger _logger;
 
-    public WebSyncService(DatabaseService db, IWebSyncClient client, ILogger logger)
+    public WebSyncService(IDatabaseService db, IWebSyncClient client, ILogger logger)
     {
         _db = db;
         _client = client;

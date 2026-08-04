@@ -12,11 +12,11 @@ namespace MixRanking.Commands;
 /// <summary>Comandos administrativos para gerenciar ratings.</summary>
 public class AdminCommands
 {
-    private readonly DatabaseService _db;
+    private readonly IDatabaseService _db;
     private readonly RankingConfig _config;
     private readonly WebSyncService _webSyncService;
 
-    public AdminCommands(DatabaseService db, RankingConfig config, WebSyncService webSyncService)
+    public AdminCommands(IDatabaseService db, RankingConfig config, WebSyncService webSyncService)
     {
         _db = db;
         _config = config;

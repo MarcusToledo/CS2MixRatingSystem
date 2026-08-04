@@ -13,12 +13,12 @@ namespace MixRanking.Services;
 /// </summary>
 public class RatingService
 {
-    private readonly DatabaseService _db;
+    private readonly IDatabaseService _db;
     private readonly RankingConfig _config;
     private readonly WebSyncService _webSyncService;
     private readonly ILogger _logger;
 
-    public RatingService(DatabaseService db, RankingConfig config, WebSyncService webSyncService, ILogger logger)
+    public RatingService(IDatabaseService db, RankingConfig config, WebSyncService webSyncService, ILogger logger)
     {
         _db = db;
         _config = config;
