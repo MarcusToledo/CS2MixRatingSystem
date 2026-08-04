@@ -1,6 +1,4 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
-using MixRanking.Database;
 using MixRanking.Models;
 using MixRanking.Services;
 using Xunit;
@@ -30,29 +28,18 @@ internal class FakeWebSyncClient : IWebSyncClient
     }
 }
 
-public class WebSyncServiceTests : IDisposable
+public class WebSyncServiceTests
 {
-    private readonly SqliteConnection _keepAliveConnection;
-    private const string ConnectionString = "Data Source=InMemoryDbWebSync;Mode=Memory;Cache=Shared";
-    private readonly DatabaseService _db;
+    private readonly FakeDatabaseService _db;
 
     public WebSyncServiceTests()
     {
-        _keepAliveConnection = new SqliteConnection(ConnectionString);
-        _keepAliveConnection.Open();
-        _db = new DatabaseService("InMemoryDbWebSync;Mode=Memory;Cache=Shared");
-    }
-
-    public void Dispose()
-    {
-        _keepAliveConnection.Close();
-        _keepAliveConnection.Dispose();
+        _db = new FakeDatabaseService();
     }
 
     [Fact]
     public async Task MarkDirtyAsync_UpsertsPlayerIntoQueue()
     {
-        await _db.InitializeAsync();
         var client = new FakeWebSyncClient();
         var service = new WebSyncService(_db, client, NullLogger.Instance);
 
@@ -71,7 +58,6 @@ public class WebSyncServiceTests : IDisposable
     [Fact]
     public async Task DrainPendingAsync_ClearsQueueOnSuccess()
     {
-        await _db.InitializeAsync();
         var client = new FakeWebSyncClient { SendPlayersResult = true };
         var service = new WebSyncService(_db, client, NullLogger.Instance);
         await service.MarkDirtyAsync(new PlayerData { SteamId = "76561198000000031", Name = "P1", CreatedAt = DateTime.UtcNow });
@@ -87,7 +73,6 @@ public class WebSyncServiceTests : IDisposable
     [Fact]
     public async Task DrainPendingAsync_KeepsQueuePendingOnFailure()
     {
-        await _db.InitializeAsync();
         var client = new FakeWebSyncClient { SendPlayersResult = false };
         var service = new WebSyncService(_db, client, NullLogger.Instance);
         await service.MarkDirtyAsync(new PlayerData { SteamId = "76561198000000032", Name = "P2", CreatedAt = DateTime.UtcNow });
@@ -104,7 +89,6 @@ public class WebSyncServiceTests : IDisposable
     [Fact]
     public async Task DrainPendingAsync_SendsWipeSignal_WhenWipePending()
     {
-        await _db.InitializeAsync();
         await _db.SetWipePendingAsync();
         var client = new FakeWebSyncClient { SendWipeResult = true };
         var service = new WebSyncService(_db, client, NullLogger.Instance);

@@ -1,7 +1,5 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging.Abstractions;
 using MixRanking.Config;
-using MixRanking.Database;
 using MixRanking.Models;
 using MixRanking.Services;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -9,20 +7,16 @@ using Xunit;
 
 namespace MixRanking.Tests;
 
-public class RatingTests : IDisposable
+public class RatingTests
 {
-    private readonly SqliteConnection _keepAliveConnection;
-    private const string ConnectionString = "Data Source=InMemoryDbRating;Mode=Memory;Cache=Shared";
-    private readonly DatabaseService _db;
+    private readonly FakeDatabaseService _db;
     private readonly RankingConfig _config;
     private readonly WebSyncService _webSyncService;
     private readonly RatingService _ratingService;
 
     public RatingTests()
     {
-        _keepAliveConnection = new SqliteConnection(ConnectionString);
-        _keepAliveConnection.Open();
-        _db = new DatabaseService("InMemoryDbRating;Mode=Memory;Cache=Shared");
+        _db = new FakeDatabaseService();
 
         _config = new RankingConfig
         {
@@ -39,17 +33,9 @@ public class RatingTests : IDisposable
         _ratingService = new RatingService(_db, _config, _webSyncService, NullLogger.Instance);
     }
 
-    public void Dispose()
-    {
-        _keepAliveConnection.Close();
-        _keepAliveConnection.Dispose();
-    }
-
     [Fact]
     public async Task ProcessMatchEndAsync_AppliesPlacementDoubleKFactor()
     {
-        await _db.InitializeAsync();
-
         // Arrange: Player has 0 matches (less than 10)
         var stats = new MatchPlayerStats
         {
@@ -106,19 +92,13 @@ public class RatingTests : IDisposable
     [Fact]
     public async Task ProcessMatchEndAsync_AppliesStandardKFactorAfterPlacement()
     {
-        await _db.InitializeAsync();
-
         // Arrange: Player already has 10 matches in DB
         // Insert player with 10 matches
-        using (var connection = new SqliteConnection(ConnectionString))
+        _db.Players["76561198000000200"] = new PlayerData
         {
-            await connection.OpenAsync();
-            using var command = connection.CreateCommand();
-            command.CommandText = @"
-                INSERT INTO players (steamid, name, rating, matches, wins, losses)
-                VALUES ('76561198000000200', 'ExperiencedPlayer', 1200, 10, 5, 5);";
-            await command.ExecuteNonQueryAsync();
-        }
+            SteamId = "76561198000000200", Name = "ExperiencedPlayer",
+            Rating = 1200, Matches = 10, Wins = 5, Losses = 5
+        };
 
         var stats = new MatchPlayerStats
         {
@@ -163,8 +143,6 @@ public class RatingTests : IDisposable
     [Fact]
     public async Task ProcessMatchEndAsync_MarksUpdatedPlayerForWebSync()
     {
-        await _db.InitializeAsync();
-
         var stats = new MatchPlayerStats
         {
             SteamId = 76561198000000300,
