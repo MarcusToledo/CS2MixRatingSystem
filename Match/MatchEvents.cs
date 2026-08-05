@@ -272,6 +272,8 @@ public class MatchEvents
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"[{_config.ChatPrefix}] Error processing match end.");
+                Server.NextFrame(() =>
+                    Server.PrintToChatAll($" {ChatColors.Red}[{_config.ChatPrefix}]{ChatColors.Default} Erro ao salvar resultado da partida, contate um admin."));
             }
             finally
             {

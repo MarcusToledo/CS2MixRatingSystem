@@ -24,7 +24,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
     /// <summary>Configuração do plugin (carregada automaticamente do JSON).</summary>
     public RankingConfig Config { get; set; } = new();
 
-    private DatabaseService _database = null!;
+    private SupabaseDatabaseService _database = null!;
     private StatisticsService _statistics = null!;
     private HttpWebSyncClient _webSyncClient = null!;
     private WebSyncService _webSyncService = null!;
@@ -45,19 +45,9 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
         Logger.LogInformation("[MixRanking] Loading plugin v{Version}...", ModuleVersion);
 
         // 1. Initialize database
-        string dbPath = Path.Combine(ModuleDirectory, "mixranking.db");
-        _database = new DatabaseService(dbPath);
-
-        try
-        {
-            _database.InitializeAsync().GetAwaiter().GetResult();
-            Logger.LogInformation("[MixRanking] Database initialized at {Path}", dbPath);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "[MixRanking] Failed to initialize database!");
-            throw;
-        }
+        _database = new SupabaseDatabaseService(Config, Logger);
+        _database.InitializeAsync().GetAwaiter().GetResult();
+        Logger.LogInformation("[MixRanking] Supabase persistence initialized at {Url}", Config.SupabaseUrl);
 
         // 2. Initialize services
         _statistics = new StatisticsService();
@@ -106,6 +96,7 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
     public override void Unload(bool hotReload)
     {
         _webSyncClient?.Dispose();
+        _database?.Dispose();
         Logger.LogInformation("[MixRanking] Plugin unloaded.");
     }
 }
