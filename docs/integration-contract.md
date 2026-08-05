@@ -12,6 +12,14 @@ This document details the database schema and data format contract between the C
 > sem filesystem compartilhado) o inviabiliza. A integração ativa é o sync HTTP outbound
 > descrito na seção 4.
 
+> [!IMPORTANT]
+> **Armazenamento ativo:** a partir desta versão, o plugin não usa mais SQLite local —
+> os dados descritos na seção 2 (schema) vivem num projeto Supabase (Postgres) dedicado,
+> acessado via PostgREST. O schema Postgres e o contrato de funções RPC estão em
+> `docs/superpowers/specs/2026-08-02-supabase-persistence-migration-design.md`. A seção 2
+> abaixo permanece útil como referência do MODELO de dados (nomes de tabela/coluna são os
+> mesmos), mas o SGBD e o mecanismo de acesso mudaram.
+
 ---
 
 ## 1. Key Integration Rules
