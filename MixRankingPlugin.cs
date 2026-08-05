@@ -12,7 +12,8 @@ namespace MixRanking;
 
 /// <summary>
 /// MixRanking — Plugin de ranking permanente para CS2.
-/// Sistema Elo com swing de performance, integrado ao MatchZy.
+/// Sistema Elo com swing de performance. Só ranqueia partidas no modo configurado
+/// em RankedModeName, verificado via a capability game_mode:api do GameModeManager.
 /// </summary>
 public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
 {

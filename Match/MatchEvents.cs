@@ -1,6 +1,8 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Utils;
+using GameModeManager.Shared;
 using MixRanking.Models;
 using MixRanking.Services;
 using MixRanking.Config;
@@ -18,6 +20,7 @@ public class MatchEvents
     private readonly StatisticsService _statistics;
     private readonly ILogger _logger;
     private readonly RankingConfig _config;
+    private readonly PluginCapability<IGameModeApi?> _gameModeCapability = new("game_mode:api");
 
     public MatchEvents(MatchService matchService, StatisticsService statistics, RankingConfig config, ILogger logger)
     {
@@ -119,14 +122,27 @@ public class MatchEvents
         // antes dos times serem definidos, zerando InitialCtCount/InitialTCount.
         if (_matchService.IsLive) return HookResult.Continue;
 
+        string? currentModeName = _gameModeCapability.Get()?.State?.CurrentMode?.Name;
+
+        if (!GameModeGate.IsRankedMode(currentModeName, _config.RankedModeName))
+        {
+            _logger.LogWarning(
+                "[MixRanking] Match start ignorado — modo atual: '{Mode}' (esperado: '{Required}'). Partida não será ranqueada.",
+                currentModeName ?? "desconhecido (GameModeManager indisponível ou capability não resolvida)",
+                _config.RankedModeName);
+            return HookResult.Continue;
+        }
+
         var players = Utilities.GetPlayers();
         int ctCount = 0, tCount = 0;
 
         foreach (var player in players)
         {
-            if (player.IsValid && !player.IsBot && !player.IsHLTV)
+            if (!player.IsValid) continue;
+
+            var team = (CsTeam)player.TeamNum;
+            if (PlayerFilters.IsActiveMatchPlayer(player.IsValid, player.IsBot, player.IsHLTV, team))
             {
-                var team = (CsTeam)player.TeamNum;
                 if (team == CsTeam.CounterTerrorist) ctCount++;
                 else if (team == CsTeam.Terrorist) tCount++;
 
@@ -160,7 +176,10 @@ public class MatchEvents
 
         foreach (var player in players)
         {
-            if (player.IsValid && !player.IsBot && !player.IsHLTV)
+            if (!player.IsValid) continue;
+
+            var team = (CsTeam)player.TeamNum;
+            if (PlayerFilters.IsActiveMatchPlayer(player.IsValid, player.IsBot, player.IsHLTV, team))
             {
                 var pawn = player.PlayerPawn?.Value;
                 if (pawn != null && pawn.Health > 0)

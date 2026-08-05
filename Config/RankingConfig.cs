@@ -53,6 +53,10 @@ public class RankingConfig : BasePluginConfig
     [JsonPropertyName("ChatPrefix")]
     public string ChatPrefix { get; set; } = "GurizadaMix";
 
+    /// <summary>Nome do modo (reportado pelo GameModeManager) que deve ser ranqueado. Outros modos (ex: Retake) são ignorados.</summary>
+    [JsonPropertyName("RankedModeName")]
+    public string RankedModeName { get; set; } = "Competitivo";
+
     /// <summary>Habilita o sync outbound de rating/nível com a plataforma web.</summary>
     [JsonPropertyName("WebSyncEnabled")]
     public bool WebSyncEnabled { get; set; } = false;
