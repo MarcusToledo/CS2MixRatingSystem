@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Logging.Abstractions;
 using MixRanking.Config;
 using MixRanking.Database;
@@ -129,5 +130,71 @@ public class SupabaseDatabaseServiceTests
         var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, handler);
 
         Assert.True(await db.IsWipePendingAsync());
+    }
+
+    [Fact]
+    public async Task WriteMatchEndResultAsync_PostsToCorrectRpcEndpoint()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, handler);
+        var match = new MatchRecord { MatchGuid = Guid.NewGuid().ToString(), Map = "de_dust2", WinnerTeam = 3, CtScore = 13, TScore = 9 };
+        var stats = new MatchPlayerStats { SteamId = 76561198000000004, PlayerName = "Manu", Team = CsTeam.CounterTerrorist, Kills = 20, Deaths = 15, RoundsPlayed = 22 };
+        var update = new MatchPlayerUpdate
+        {
+            Stats = stats,
+            PlayerData = new PlayerData { SteamId = "76561198000000004", Name = "Manu", Rating = 1000 },
+            RatingChange = new RatingChange { SteamId = "76561198000000004", OldRating = 1000, BaseChange = 30, PerformanceSwing = 5, TotalChange = 35, NewRating = 1035, KFactorUsed = 100 },
+            NewRating = 1035,
+            Won = true
+        };
+
+        await db.WriteMatchEndResultAsync(match, new List<MatchPlayerUpdate> { update }, 1000, 1);
+
+        Assert.Equal("https://fake-project.supabase.co/rest/v1/rpc/write_match_end_result", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Contains("\"map\":\"de_dust2\"", handler.LastRequestBody);
+        Assert.Contains("\"steamid\":\"76561198000000004\"", handler.LastRequestBody);
+    }
+
+    [Fact]
+    public async Task WriteMatchEndResultAsync_RetriesOnFailureThenSucceeds()
+    {
+        int callCount = 0;
+        var handler = new FakeHttpMessageHandler();
+        var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, new CountingFailThenSucceedHandler(() => callCount++, failuresBeforeSuccess: 1));
+        var match = new MatchRecord { MatchGuid = Guid.NewGuid().ToString(), Map = "de_mirage", WinnerTeam = 2, CtScore = 9, TScore = 13 };
+
+        await db.WriteMatchEndResultAsync(match, new List<MatchPlayerUpdate>(), 1000, 1);
+
+        Assert.Equal(2, callCount);
+    }
+
+    [Fact]
+    public async Task GetActiveSeasonIdAsync_ReturnsDefaultOne_WhenNoActiveSeasonFound()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, handler);
+
+        Assert.Equal(1, await db.GetActiveSeasonIdAsync());
+    }
+}
+
+internal class CountingFailThenSucceedHandler : HttpMessageHandler
+{
+    private readonly Action _onCall;
+    private readonly int _failuresBeforeSuccess;
+    private int _calls;
+
+    public CountingFailThenSucceedHandler(Action onCall, int failuresBeforeSuccess)
+    {
+        _onCall = onCall;
+        _failuresBeforeSuccess = failuresBeforeSuccess;
+    }
+
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        _onCall();
+        _calls++;
+        var status = _calls <= _failuresBeforeSuccess ? HttpStatusCode.InternalServerError : HttpStatusCode.OK;
+        return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent("[]", Encoding.UTF8, "application/json") });
     }
 }
