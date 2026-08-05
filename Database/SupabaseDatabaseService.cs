@@ -27,15 +27,17 @@ public partial class SupabaseDatabaseService : IDatabaseService, IDisposable
         _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(5) };
     }
 
-    public async Task InitializeAsync()
+    public async Task<bool> InitializeAsync()
     {
         try
         {
             using var response = await SendAsync(HttpMethod.Get, "players?limit=1", null);
+            return true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "[MixRanking] Failed to reach Supabase at startup — plugin will keep loading, commands will report errors until connectivity is restored.");
+            return false;
         }
     }
 
@@ -54,7 +56,14 @@ public partial class SupabaseDatabaseService : IDatabaseService, IDisposable
         }
 
         var response = await _httpClient.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var statusCode = response.StatusCode;
+            var errorBody = await response.Content.ReadAsStringAsync();
+            response.Dispose();
+            throw new HttpRequestException(
+                $"Supabase request failed: {method} {pathAndQuery} -> {(int)statusCode} {statusCode}. Response body: {errorBody}");
+        }
         return response;
     }
 

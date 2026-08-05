@@ -208,7 +208,7 @@ O corpo `plpgsql` completo de cada função fica a cargo de quem aplica o schema
 | `GetPlayerTotalRoundsPlayedAsync` | RPC `rpc/get_player_total_rounds` (SUM não é possível via filtro REST simples) |
 | `GetPlayersBySteamIdsAsync` | `GET players?steamid=in.(id1,id2,...)` |
 | `GetActiveSeasonIdAsync` | `GET seasons?is_active=eq.true&select=id&limit=1` |
-| `GetLastRatingChangeAsync` | `GET rating_history?select=*,matches(*)&steamid=eq.X&order=id.desc&limit=1` (embedding PostgREST via FK) |
+| `GetLastRatingChangeAsync` | `GET rating_history?steamid=eq.X&order=id.desc&limit=1` (select plano, sem embedding — `StatsCommand.cs` busca a partida separadamente via `GetMatchByIdAsync` quando precisa) |
 | `GetRatingHistoryAsync` | `GET rating_history?steamid=eq.X&order=id.desc&limit=N` |
 | `GetMatchByIdAsync` | `GET matches?id=eq.X` |
 | `UpsertWebSyncQueueAsync` | `POST web_sync_queue` com header `Prefer: resolution=merge-duplicates` |

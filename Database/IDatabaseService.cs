@@ -5,7 +5,7 @@ namespace MixRanking.Database;
 /// <summary>Contrato de persistência do plugin. Implementações: SupabaseDatabaseService (produção), FakeDatabaseService (teste).</summary>
 public interface IDatabaseService
 {
-    Task InitializeAsync();
+    Task<bool> InitializeAsync();
 
     Task<PlayerData> GetOrCreatePlayerAsync(string steamId, string name, int initialRating);
     Task<PlayerData?> GetPlayerAsync(string steamId);

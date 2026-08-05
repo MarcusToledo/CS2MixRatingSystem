@@ -45,9 +45,21 @@ public class MixRankingPlugin : BasePlugin, IPluginConfig<RankingConfig>
         Logger.LogInformation("[MixRanking] Loading plugin v{Version}...", ModuleVersion);
 
         // 1. Initialize database
+        if (!Config.SupabaseUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(Config.SupabaseServiceKey))
+        {
+            Logger.LogError("[MixRanking] SupabaseUrl/SupabaseServiceKey not configured — todos os comandos falharão até configurar.");
+        }
+
         _database = new SupabaseDatabaseService(Config, Logger);
-        _database.InitializeAsync().GetAwaiter().GetResult();
-        Logger.LogInformation("[MixRanking] Supabase persistence initialized at {Url}", Config.SupabaseUrl);
+        bool supabaseReady = _database.InitializeAsync().GetAwaiter().GetResult();
+        if (supabaseReady)
+        {
+            Logger.LogInformation("[MixRanking] Supabase persistence initialized at {Url}", Config.SupabaseUrl);
+        }
+        else
+        {
+            Logger.LogWarning("[MixRanking] Supabase ping failed at startup — plugin will keep loading, commands will report errors until connectivity is restored.");
+        }
 
         // 2. Initialize services
         _statistics = new StatisticsService();

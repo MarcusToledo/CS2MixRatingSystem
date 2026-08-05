@@ -20,7 +20,7 @@ internal class FakeDatabaseService : IDatabaseService
 
     public record AdminAuditEntry(string Action, string? AdminSteamId, string AdminName, string? TargetSteamId, int? OldValue, int? NewValue, string? Reason);
 
-    public Task InitializeAsync() => Task.CompletedTask;
+    public Task<bool> InitializeAsync() => Task.FromResult(true);
 
     public Task<PlayerData> GetOrCreatePlayerAsync(string steamId, string name, int initialRating)
     {
