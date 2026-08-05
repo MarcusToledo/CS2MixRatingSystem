@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using MixRanking.Config;
 using MixRanking.Database;
+using MixRanking.Models;
 using Xunit;
 
 namespace MixRanking.Tests;
@@ -99,5 +100,34 @@ public class SupabaseDatabaseServiceTests
         Assert.Equal(1000, player.Rating);
         Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
         Assert.Contains("\"steamid\":\"76561198000000002\"", handler.LastRequestBody);
+    }
+
+    [Fact]
+    public async Task UpsertWebSyncQueueAsync_SendsUpsertWithMergeDuplicatesHeader()
+    {
+        var handler = new FakeHttpMessageHandler();
+        var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, handler);
+        var player = new PlayerData { SteamId = "76561198000000003", Name = "Dirty", Rating = 1200, CreatedAt = DateTime.UtcNow };
+
+        await db.UpsertWebSyncQueueAsync(player);
+
+        Assert.Equal(HttpMethod.Post, handler.LastRequest!.Method);
+        Assert.Equal("resolution=merge-duplicates", handler.LastRequest.Headers.GetValues("Prefer").First());
+        Assert.Contains("\"steamid\":\"76561198000000003\"", handler.LastRequestBody);
+    }
+
+    [Fact]
+    public async Task IsWipePendingAsync_ReturnsTrue_WhenFlagIsSet()
+    {
+        var handler = new FakeHttpMessageHandler
+        {
+            ResponseToReturn = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""[{"wipe_pending":true}]""", Encoding.UTF8, "application/json")
+            }
+        };
+        var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, handler);
+
+        Assert.True(await db.IsWipePendingAsync());
     }
 }
