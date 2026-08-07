@@ -55,7 +55,7 @@ public class RankingConfig : BasePluginConfig
 
     /// <summary>Nome do modo (reportado pelo GameModeManager) que deve ser ranqueado. Outros modos (ex: Retake) são ignorados.</summary>
     [JsonPropertyName("RankedModeName")]
-    public string RankedModeName { get; set; } = "Competitivo";
+    public string RankedModeName { get; set; } = "Competitive";
 
     /// <summary>Habilita o sync outbound de rating/nível com a plataforma web.</summary>
     [JsonPropertyName("WebSyncEnabled")]
