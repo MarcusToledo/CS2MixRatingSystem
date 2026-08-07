@@ -122,7 +122,7 @@ public class MatchEvents
         // antes dos times serem definidos, zerando InitialCtCount/InitialTCount.
         if (_matchService.IsLive) return HookResult.Continue;
 
-        string? currentModeName = _gameModeCapability.Get()?.State?.CurrentMode?.Name;
+        string? currentModeName = ResolveCurrentModeName();
 
         if (!GameModeGate.IsRankedMode(currentModeName, _config.RankedModeName))
         {
@@ -154,6 +154,28 @@ public class MatchEvents
         _matchService.SetLive(ctCount, tCount);
 
         return HookResult.Continue;
+    }
+
+    /// <summary>
+    /// Resolve o nome do modo atual via a capability game_mode:api do GameModeManager.
+    /// Isolado em try/catch porque essa chamada atravessa a fronteira de um plugin externo:
+    /// uma versão de GameModeManager desatualizada/incompatível no servidor pode não
+    /// implementar membros que o GameModeManager.Shared referenciado aqui espera (ex:
+    /// MissingMethodException em IGameModeApi.State), o que sem isso derrubava o handler
+    /// inteiro antes de qualquer log — a partida ficava sem nenhum registro e sem pista do motivo.
+    /// </summary>
+    private string? ResolveCurrentModeName()
+    {
+        try
+        {
+            return _gameModeCapability.Get()?.State?.CurrentMode?.Name;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "[MixRanking] Falha ao consultar GameModeManager (game_mode:api) — possível incompatibilidade de versão entre o plugin MixRanking e o GameModeManager instalado no servidor. Partida não será ranqueada.");
+            return null;
+        }
     }
 
     private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
