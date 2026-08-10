@@ -183,6 +183,22 @@ public class StatisticsService
         }
     }
 
+    /// <summary>
+    /// Reverte a marca de abandono de um jogador que reconectou antes do fim da partida.
+    /// Sem isso, um disconnect momentâneo (queda de rede, reload de plugin) deixa a flag
+    /// travada em true mesmo que o jogador volte e jogue o resto da partida normalmente.
+    /// </summary>
+    /// <returns>True se havia uma marca de abandono para reverter.</returns>
+    public bool ClearAbandoned(ulong steamId)
+    {
+        if (_playerStats.TryGetValue(steamId, out var stats) && stats.Abandoned)
+        {
+            stats.Abandoned = false;
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>Limpa todas as estatísticas (início de nova partida).</summary>
     public void Reset()
     {
