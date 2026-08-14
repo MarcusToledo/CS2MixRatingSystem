@@ -145,4 +145,39 @@ public class StatisticsServiceTests
 
         Assert.Equal(1, stats.RoundsWithKast);
     }
+
+    [Fact]
+    public void ClearAbandoned_RevertsFlag_WhenPlayerReconnects()
+    {
+        var service = new StatisticsService();
+        service.GetOrCreateStats(AttackerSteamId, "Player", CsTeam.CounterTerrorist);
+        service.MarkAbandoned(AttackerSteamId);
+
+        bool cleared = service.ClearAbandoned(AttackerSteamId);
+
+        Assert.True(cleared);
+        Assert.False(service.GetAllPlayerStats()[AttackerSteamId].Abandoned);
+    }
+
+    [Fact]
+    public void ClearAbandoned_ReturnsFalse_WhenPlayerWasNeverAbandoned()
+    {
+        var service = new StatisticsService();
+        service.GetOrCreateStats(AttackerSteamId, "Player", CsTeam.CounterTerrorist);
+
+        bool cleared = service.ClearAbandoned(AttackerSteamId);
+
+        Assert.False(cleared);
+        Assert.False(service.GetAllPlayerStats()[AttackerSteamId].Abandoned);
+    }
+
+    [Fact]
+    public void ClearAbandoned_ReturnsFalse_ForUnknownPlayer()
+    {
+        var service = new StatisticsService();
+
+        bool cleared = service.ClearAbandoned(999999);
+
+        Assert.False(cleared);
+    }
 }

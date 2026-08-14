@@ -59,9 +59,27 @@ public class MatchService
         _logger.LogInformation("[MixRanking] New match initialized: {MatchGuid}", MatchGuid);
     }
 
-    /// <summary>Marca a partida como live (após warmup/knife).</summary>
+    /// <summary>
+    /// Marca a partida como live (após warmup/knife). Em condições normais isso só
+    /// acontece uma vez por partida — EventRoundAnnounceMatchStart é o sinal do próprio
+    /// jogo para "warmup/faca terminou, a partida está ao vivo agora". Se ele disparar de
+    /// novo enquanto já estamos live, é porque algo externo (reload do MatchZy, restart de
+    /// mapa/modo) reiniciou o warmup+faca no meio da partida — as estatísticas acumuladas
+    /// até aqui incluem rounds que não pertencem à partida ranqueada final e precisam ser
+    /// descartadas, senão inflam RoundsPlayed/Kills/ADR de todo mundo (ex: partida real de
+    /// 21 rounds registrando RoundsPlayed=56 por causa de um reload no meio do jogo).
+    /// </summary>
     public void SetLive(int ctCount, int tCount)
     {
+        if (IsLive)
+        {
+            _logger.LogWarning(
+                "[MixRanking] Partida reiniciada externamente no meio do jogo (round {Round}) — " +
+                "descartando estatísticas acumuladas antes do restart.", CurrentRound);
+            _statistics.Reset();
+            CurrentRound = 0;
+        }
+
         IsLive = true;
         InitialCtCount = ctCount;
         InitialTCount = tCount;

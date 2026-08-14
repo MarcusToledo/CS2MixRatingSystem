@@ -42,6 +42,7 @@ public class MatchEvents
         plugin.RegisterEventHandler<EventBombPlanted>(OnBombPlanted);
         plugin.RegisterEventHandler<EventBombDefused>(OnBombDefused);
         plugin.RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
+        plugin.RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
         plugin.RegisterEventHandler<EventCsWinPanelMatch>(OnMatchEnd);
 
         _logger.LogInformation("[MixRanking] Event handlers registered.");
@@ -117,11 +118,12 @@ public class MatchEvents
     private HookResult OnRoundAnnounceMatchStart(EventRoundAnnounceMatchStart @event, GameEventInfo info)
     {
         // Disparado quando a partida realmente vai ao vivo (pós warmup/faca).
-        // Diferente de EventRoundStart, que também dispara durante o warmup —
-        // usá-lo aqui evitava que a contagem inicial de jogadores fosse tirada
-        // antes dos times serem definidos, zerando InitialCtCount/InitialTCount.
-        if (_matchService.IsLive) return HookResult.Continue;
-
+        // Diferente de EventRoundStart, que também dispara durante o warmup — usá-lo aqui
+        // evita que a contagem inicial de jogadores seja tirada antes dos times serem
+        // definidos. Não há early-return por _matchService.IsLive aqui de propósito: se
+        // esse evento disparar de novo enquanto já estamos live, o próprio jogo reiniciou
+        // o warmup+faca no meio da partida (reload de plugin/modo) — MatchService.SetLive
+        // trata esse caso como um restart real e descarta as estatísticas antigas.
         string? currentModeName = ResolveCurrentModeName();
 
         if (!GameModeGate.IsRankedMode(currentModeName, _config.RankedModeName))
@@ -247,9 +249,39 @@ public class MatchEvents
         var player = @event.Userid;
         if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
 
+        // Reason distingue abandono real (saiu, foi kickado, caiu a conexão) de uma
+        // desconexão causada pelo próprio servidor (changelevel, troca de modo do
+        // GameModeManager, reload de plugin) — essa última não deve penalizar o jogador.
+        if (DisconnectReasons.IsInfrastructureTransition(@event.Reason))
+        {
+            _logger.LogInformation(
+                "[MixRanking] Player {Name} ({SteamId}) caiu por transição de infraestrutura do servidor (reason={Reason}) — não contabilizado como abandono.",
+                player.PlayerName, player.SteamID, @event.Reason);
+            return HookResult.Continue;
+        }
+
         _statistics.MarkAbandoned(player.SteamID);
         _logger.LogInformation("[MixRanking] Player {Name} ({SteamId}) abandoned the match.",
             player.PlayerName, player.SteamID);
+
+        return HookResult.Continue;
+    }
+
+    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
+    {
+        if (!_matchService.IsLive) return HookResult.Continue;
+
+        var player = @event.Userid;
+        if (player == null || !player.IsValid || player.IsBot) return HookResult.Continue;
+
+        // Jogador reconectou antes do fim da partida — reverte qualquer marca de abandono
+        // deixada por um disconnect anterior (queda de rede, reload de plugin) para que ele
+        // não leve a penalidade de rating por algo que já foi corrigido sozinho.
+        if (_statistics.ClearAbandoned(player.SteamID))
+        {
+            _logger.LogInformation("[MixRanking] Player {Name} ({SteamId}) reconectou — marca de abandono revertida.",
+                player.PlayerName, player.SteamID);
+        }
 
         return HookResult.Continue;
     }
