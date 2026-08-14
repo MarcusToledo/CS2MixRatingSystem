@@ -40,10 +40,11 @@ public partial class SupabaseDatabaseService
         });
     }
 
-    public async Task ResetAllDataWithAuditAsync(string? adminSteamId, string adminName, string? reason)
+    public async Task ResetAllDataWithAuditAsync(int initialRating, string? adminSteamId, string adminName, string? reason)
     {
         using var response = await SendAsync(HttpMethod.Post, "rpc/reset_all_data", new
         {
+            p_initial_rating = initialRating,
             p_admin_steamid = adminSteamId,
             p_admin_name = adminName,
             p_reason = reason

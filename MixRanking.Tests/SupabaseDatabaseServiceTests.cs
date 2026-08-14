@@ -183,9 +183,10 @@ public class SupabaseDatabaseServiceTests
         var handler = new FakeHttpMessageHandler();
         var db = new SupabaseDatabaseService(MakeConfig(), NullLogger.Instance, handler);
 
-        await db.ResetAllDataWithAuditAsync("76561198158106029", "DESACREDITADOS leluia", "reset de teste");
+        await db.ResetAllDataWithAuditAsync(1000, "76561198158106029", "DESACREDITADOS leluia", "reset de teste");
 
         Assert.Equal("https://fake-project.supabase.co/rest/v1/rpc/reset_all_data", handler.LastRequest!.RequestUri!.ToString());
+        Assert.Contains("\"p_initial_rating\":1000", handler.LastRequestBody);
         Assert.Contains("\"p_admin_steamid\":\"76561198158106029\"", handler.LastRequestBody);
         Assert.Contains("\"p_reason\":\"reset de teste\"", handler.LastRequestBody);
     }

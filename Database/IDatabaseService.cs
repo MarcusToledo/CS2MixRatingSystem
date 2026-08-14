@@ -32,5 +32,5 @@ public interface IDatabaseService
     Task SetPlayerRatingWithAuditAsync(string targetSteamId, int newRating, string? adminSteamId, string adminName, string? reason);
     Task ResetPlayerWithAuditAsync(string targetSteamId, int initialRating, string? adminSteamId, string adminName, string? reason);
     Task AdjustPlayerRatingWithAuditAsync(string targetSteamId, int amount, bool isAdd, int minRating, string? adminSteamId, string adminName, string? reason);
-    Task ResetAllDataWithAuditAsync(string? adminSteamId, string adminName, string? reason);
+    Task ResetAllDataWithAuditAsync(int initialRating, string? adminSteamId, string adminName, string? reason);
 }

@@ -40,7 +40,7 @@ public class AdminCommands
         plugin.AddCommand("css_rating_reset", "[ADMIN] Reseta um jogador.", OnRatingReset);
         plugin.AddCommand("css_rating_add", "[ADMIN] Adiciona pontos de rating.", OnRatingAdd);
         plugin.AddCommand("css_rating_remove", "[ADMIN] Remove pontos de rating.", OnRatingRemove);
-        plugin.AddCommand("css_rating_wipe", "[ADMIN] Reseta completamente o ranking (deleta todos os dados).", OnRatingWipe);
+        plugin.AddCommand("css_rating_wipe", "[ADMIN] Reseta os dados de partidas e ratings, mantendo o cadastro dos jogadores.", OnRatingWipe);
     }
 
     [RequiresPermissions("@css/root")]
@@ -288,8 +288,8 @@ public class AdminCommands
         {
             try
             {
-                await _db.ResetAllDataWithAuditAsync(adminSteamId, adminName, reason);
-                PrintToPlayer(slot, $"{ChatColors.Green}Ranking completamente resetado! Todos os dados de jogadores e partidas foram eliminados.");
+                await _db.ResetAllDataWithAuditAsync(_config.InitialRating, adminSteamId, adminName, reason);
+                PrintToPlayer(slot, $"{ChatColors.Green}Ranking resetado! Dados de partidas e ratings foram eliminados, cadastro dos jogadores foi mantido.");
             }
             catch (Exception ex)
             {

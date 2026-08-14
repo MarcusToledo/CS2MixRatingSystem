@@ -127,7 +127,7 @@ Audit trail of all administrative rating alterations.
 
 > [!WARNING]
 > **`WIPE` is destructive, not just unrecorded:**  
-> Unlike the four actions above, `WIPE` deletes all rows from `rating_history`, `match_player_stats`, `season_ratings`, and `matches`, and clears every player from `players` (not just the `rating` column). A replicated copy of this database must treat a `WIPE` audit entry as a signal to clear those tables too, not merely as an unreflected change.
+> Unlike the four actions above, `WIPE` deletes all rows from `rating_history`, `match_player_stats`, `season_ratings`, and `matches`. Rows in `players` are kept (steamid/name/created_at survive), but every aggregate column (`rating`, `matches`, `wins`, `losses`, `kills`, `deaths`, `assists`, `damage`, `mvps`) is reset to its initial value — no player has to be re-registered after a wipe. A replicated copy of this database must treat a `WIPE` audit entry as a signal to clear those match/history tables and reset player aggregates too, not merely as an unreflected change.
 
 ---
 
