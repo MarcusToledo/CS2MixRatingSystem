@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using MixRanking.Config;
 using MixRanking.Models;
@@ -26,7 +27,8 @@ public class RatingTests
             PlacementKFactorMultiplier = 2.0,
             MinRating = 100,
             MaxSwing = 7,
-            AbandonPenalty = 15
+            AbandonPenalty = 15,
+            MinRatingChangeMagnitude = 3
         };
 
         _webSyncService = new WebSyncService(_db, new FakeWebSyncClient(), NullLogger.Instance);
@@ -184,5 +186,210 @@ public class RatingTests
         Assert.Equal(5, entry.Assists);
         Assert.Equal(2000, entry.Damage);
         Assert.Equal(2, entry.Mvps);
+    }
+
+    [Fact]
+    public async Task ProcessMatchEndAsync_GuaranteesPositiveChange_WhenHeavyFavoriteWinsWithPoorPerformance()
+    {
+        // Arrange: time CT muito favorito (1400) vence o time T (1000), mas o
+        // jogador do CT tem uma performance ruim o bastante para, sem a garantia
+        // de piso mínimo, resultar em 0 pontos (ou até negativo) apesar da vitória
+        // — reproduz exatamente o bug relatado.
+        _db.Players["76561198000000400"] = new PlayerData
+        {
+            SteamId = "76561198000000400", Name = "FavoriteButBadPerformance",
+            Rating = 1400, Matches = 10, Wins = 5, Losses = 5
+        };
+        _db.Players["76561198000000401"] = new PlayerData
+        {
+            SteamId = "76561198000000401", Name = "Underdog",
+            Rating = 1000, Matches = 10, Wins = 5, Losses = 5
+        };
+
+        var badPerformer = new MatchPlayerStats
+        {
+            SteamId = 76561198000000400,
+            PlayerName = "FavoriteButBadPerformance",
+            Team = CsTeam.CounterTerrorist,
+            Kills = 6,
+            Deaths = 20,
+            Assists = 0,
+            Damage = 800,
+            RoundsPlayed = 20,
+            RoundsSurvived = 0,
+            RoundsWithKill = 5,
+            RoundsWithKast = 6,
+            Mvps = 0,
+            Abandoned = false
+        };
+        var opponent = new MatchPlayerStats
+        {
+            SteamId = 76561198000000401,
+            PlayerName = "Underdog",
+            Team = CsTeam.Terrorist,
+            Kills = 15,
+            Deaths = 15,
+            Assists = 0,
+            Damage = 1500,
+            RoundsPlayed = 20,
+            RoundsSurvived = 5,
+            RoundsWithKill = 10,
+            RoundsWithKast = 15,
+            Mvps = 0,
+            Abandoned = false
+        };
+
+        var playerStats = new Dictionary<ulong, MatchPlayerStats>
+        {
+            { badPerformer.SteamId, badPerformer },
+            { opponent.SteamId, opponent }
+        };
+
+        // Act
+        var changes = await _ratingService.ProcessMatchEndAsync(
+            Guid.NewGuid().ToString(), "de_dust2", CsTeam.CounterTerrorist, 13, 7, playerStats);
+
+        // Assert
+        var change = changes.Single(c => c.SteamId == "76561198000000400");
+        Assert.True(change.Won);
+        Assert.True(change.TotalChange >= _config.MinRatingChangeMagnitude,
+            $"Vitória não pode valer menos que o piso mínimo configurado ({_config.MinRatingChangeMagnitude}), mas TotalChange foi {change.TotalChange}.");
+        Assert.Equal(change.TotalChange, change.BaseChange + change.PerformanceSwing);
+    }
+
+    [Fact]
+    public async Task ProcessMatchEndAsync_GuaranteesNegativeChange_WhenHeavyUnderdogLosesWithGreatPerformance()
+    {
+        // Arrange: cenário simétrico — time T muito underdog (1000) perde para o
+        // CT (1400), mas o jogador do T tem uma performance excelente o bastante
+        // para, sem a garantia, terminar a partida com pontos positivos apesar
+        // de ter perdido.
+        _db.Players["76561198000000500"] = new PlayerData
+        {
+            SteamId = "76561198000000500", Name = "Favorite",
+            Rating = 1400, Matches = 10, Wins = 5, Losses = 5
+        };
+        _db.Players["76561198000000501"] = new PlayerData
+        {
+            SteamId = "76561198000000501", Name = "UnderdogGreatPerformance",
+            Rating = 1000, Matches = 10, Wins = 5, Losses = 5
+        };
+
+        var favorite = new MatchPlayerStats
+        {
+            SteamId = 76561198000000500,
+            PlayerName = "Favorite",
+            Team = CsTeam.CounterTerrorist,
+            Kills = 15,
+            Deaths = 15,
+            Assists = 0,
+            Damage = 1500,
+            RoundsPlayed = 20,
+            RoundsSurvived = 5,
+            RoundsWithKill = 10,
+            RoundsWithKast = 15,
+            Mvps = 0,
+            Abandoned = false
+        };
+        var greatPerformer = new MatchPlayerStats
+        {
+            SteamId = 76561198000000501,
+            PlayerName = "UnderdogGreatPerformance",
+            Team = CsTeam.Terrorist,
+            Kills = 30,
+            Deaths = 10,
+            Assists = 0,
+            Damage = 3000,
+            RoundsPlayed = 20,
+            RoundsSurvived = 10,
+            RoundsWithKill = 20,
+            RoundsWithKast = 20,
+            Mvps = 6,
+            Abandoned = false
+        };
+
+        var playerStats = new Dictionary<ulong, MatchPlayerStats>
+        {
+            { favorite.SteamId, favorite },
+            { greatPerformer.SteamId, greatPerformer }
+        };
+
+        // Act
+        var changes = await _ratingService.ProcessMatchEndAsync(
+            Guid.NewGuid().ToString(), "de_dust2", CsTeam.CounterTerrorist, 13, 7, playerStats);
+
+        // Assert
+        var change = changes.Single(c => c.SteamId == "76561198000000501");
+        Assert.False(change.Won);
+        Assert.True(change.TotalChange <= -_config.MinRatingChangeMagnitude,
+            $"Derrota não pode valer menos (em módulo) que o piso mínimo configurado ({_config.MinRatingChangeMagnitude}), mas TotalChange foi {change.TotalChange}.");
+        Assert.Equal(change.TotalChange, change.BaseChange + change.PerformanceSwing);
+    }
+
+    [Fact]
+    public async Task ProcessMatchEndAsync_DoesNotOverrideAbandonPenalty_WhenAbandonerIsOnWinningTeam()
+    {
+        // Arrange: mesmo cenário de favorito extremo do teste acima, mas o
+        // jogador com performance ruim abandonou a partida. A garantia de piso
+        // mínimo não deve neutralizar a AbandonPenalty.
+        _db.Players["76561198000000600"] = new PlayerData
+        {
+            SteamId = "76561198000000600", Name = "AbandonerOnWinningTeam",
+            Rating = 1400, Matches = 10, Wins = 5, Losses = 5
+        };
+        _db.Players["76561198000000601"] = new PlayerData
+        {
+            SteamId = "76561198000000601", Name = "Underdog",
+            Rating = 1000, Matches = 10, Wins = 5, Losses = 5
+        };
+
+        var abandoner = new MatchPlayerStats
+        {
+            SteamId = 76561198000000600,
+            PlayerName = "AbandonerOnWinningTeam",
+            Team = CsTeam.CounterTerrorist,
+            Kills = 6,
+            Deaths = 20,
+            Assists = 0,
+            Damage = 800,
+            RoundsPlayed = 20,
+            RoundsSurvived = 0,
+            RoundsWithKill = 5,
+            RoundsWithKast = 6,
+            Mvps = 0,
+            Abandoned = true
+        };
+        var opponent = new MatchPlayerStats
+        {
+            SteamId = 76561198000000601,
+            PlayerName = "Underdog",
+            Team = CsTeam.Terrorist,
+            Kills = 15,
+            Deaths = 15,
+            Assists = 0,
+            Damage = 1500,
+            RoundsPlayed = 20,
+            RoundsSurvived = 5,
+            RoundsWithKill = 10,
+            RoundsWithKast = 15,
+            Mvps = 0,
+            Abandoned = false
+        };
+
+        var playerStats = new Dictionary<ulong, MatchPlayerStats>
+        {
+            { abandoner.SteamId, abandoner },
+            { opponent.SteamId, opponent }
+        };
+
+        // Act
+        var changes = await _ratingService.ProcessMatchEndAsync(
+            Guid.NewGuid().ToString(), "de_dust2", CsTeam.CounterTerrorist, 13, 7, playerStats);
+
+        // Assert: mesmo tendo vencido, o abandono não é elevado ao piso mínimo
+        var change = changes.Single(c => c.SteamId == "76561198000000600");
+        Assert.True(change.Won);
+        Assert.True(change.TotalChange < 0,
+            "AbandonPenalty deve continuar valendo por completo mesmo em vitória do time.");
     }
 }
