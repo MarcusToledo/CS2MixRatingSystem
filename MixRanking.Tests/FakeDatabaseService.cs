@@ -193,10 +193,15 @@ internal class FakeDatabaseService : IDatabaseService
         return Task.CompletedTask;
     }
 
-    public Task ResetAllDataWithAuditAsync(string? adminSteamId, string adminName, string? reason)
+    public Task ResetAllDataWithAuditAsync(int initialRating, string? adminSteamId, string adminName, string? reason)
     {
         AdminAuditLog.Add(new AdminAuditEntry("WIPE", adminSteamId, adminName, null, null, null, reason));
-        Players.Clear();
+        foreach (var player in Players.Values)
+        {
+            player.Rating = initialRating;
+            player.Matches = 0; player.Wins = 0; player.Losses = 0;
+            player.Kills = 0; player.Deaths = 0; player.Assists = 0; player.Damage = 0; player.Mvps = 0;
+        }
         Matches.Clear();
         RatingHistory.Clear();
         WebSyncQueue.Clear();
