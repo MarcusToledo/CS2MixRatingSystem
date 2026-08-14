@@ -196,6 +196,9 @@ PostgREST não oferece transação client-side entre chamadas REST separadas, ne
 
 O corpo `plpgsql` completo de cada função fica a cargo de quem aplica o schema no Supabase — a assinatura e o comportamento acima são o contrato que `SupabaseDatabaseService` espera.
 
+> [!WARNING]
+> **Este projeto Supabase exige `WHERE` em todo `DELETE`/`UPDATE`** (guarda tipo `pg-safeupdate` — falha com `21000 DELETE/UPDATE requires a WHERE clause` sem isso). `reset_all_data` é a única função que opera em tabela inteira; seus `DELETE FROM x` e o `UPDATE players SET ...` precisam de um `WHERE true` (ou equivalente) no final de cada statement, mesmo afetando todas as linhas de propósito.
+
 ## Mapeamento dos 23 métodos de `IDatabaseService`
 
 | Método | Chamada Supabase |
