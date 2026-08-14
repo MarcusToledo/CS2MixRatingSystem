@@ -24,4 +24,31 @@ public static class EloCalculator
 
         return (int)Math.Round(change);
     }
+
+    /// <summary>
+    /// Garante que a mudança total (BaseChange + Swing) nunca fique abaixo do mínimo
+    /// configurado para o resultado da partida: positiva o suficiente em vitória,
+    /// negativa o suficiente em derrota. O ajuste é sempre absorvido pelo BaseChange
+    /// (nunca pelo swing), preservando o range documentado do swing e a consistência
+    /// BaseChange + PerformanceSwing == TotalChange.
+    /// </summary>
+    /// <param name="baseChange">Mudança base já calculada por CalculateBaseChange.</param>
+    /// <param name="swing">Swing de performance (já incluindo penalidade de abandono, se houver).</param>
+    /// <param name="won">Se o jogador venceu.</param>
+    /// <param name="minMagnitude">Magnitude mínima garantida (config MinRatingChangeMagnitude). 0 desativa.</param>
+    /// <returns>BaseChange ajustado (igual ao original se nenhum ajuste for necessário).</returns>
+    public static int ApplyMinimumChangeGuarantee(int baseChange, int swing, bool won, int minMagnitude)
+    {
+        if (minMagnitude <= 0) return baseChange;
+
+        int totalChange = baseChange + swing;
+
+        if (won && totalChange < minMagnitude)
+            return baseChange + (minMagnitude - totalChange);
+
+        if (!won && totalChange > -minMagnitude)
+            return baseChange - (totalChange + minMagnitude);
+
+        return baseChange;
+    }
 }

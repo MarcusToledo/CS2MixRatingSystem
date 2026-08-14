@@ -17,6 +17,15 @@ public class RankingConfig : BasePluginConfig
     [JsonPropertyName("MaxSwing")]
     public int MaxSwing { get; set; } = 7;
 
+    /// <summary>
+    /// Magnitude mínima garantida da mudança total de rating por resultado de partida.
+    /// Uma vitória nunca resulta em ganho menor que este valor; uma derrota nunca resulta
+    /// em perda menor (em módulo) que este valor. Jogadores marcados como Abandoned ficam
+    /// fora desta garantia (a AbandonPenalty deve valer por completo). 0 desativa a garantia.
+    /// </summary>
+    [JsonPropertyName("MinRatingChangeMagnitude")]
+    public int MinRatingChangeMagnitude { get; set; } = 3;
+
     /// <summary>Número mínimo de rounds para a partida ser computada.</summary>
     [JsonPropertyName("MinRounds")]
     public int MinRounds { get; set; } = 10;

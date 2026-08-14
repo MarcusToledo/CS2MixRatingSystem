@@ -296,6 +296,14 @@ public class MatchEvents
             return HookResult.Continue;
         }
 
+        // Marca a partida como não mais live IMEDIATAMENTE e de forma síncrona (thread
+        // principal), antes de qualquer processamento assíncrono abaixo. Sem isso, um
+        // jogador que desconecta logo após o painel de vitória (comportamento normal —
+        // "gg, saindo") pode ter seu OnPlayerDisconnect processado pela thread principal
+        // antes do Task.Run abaixo sequer começar a rodar, e é incorretamente marcado
+        // como Abandoned mesmo tendo jogado a partida quase inteira.
+        _matchService.MarkEnded();
+
         // Announce match end immediately
         Server.PrintToChatAll($" {ChatColors.Gold}[{_config.ChatPrefix}]{ChatColors.Default} Partida finalizada! Processando estatísticas e ranking...");
 

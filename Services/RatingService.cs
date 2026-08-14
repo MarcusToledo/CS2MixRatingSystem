@@ -108,6 +108,14 @@ public class RatingService
                 swing -= _config.AbandonPenalty;
             }
 
+            // Garante que vitória/derrota nunca sejam anuladas pelo swing — exceto para
+            // abandonos, cuja AbandonPenalty é a penalidade intencional e não deve ser
+            // neutralizada por essa garantia.
+            if (!stats.Abandoned)
+            {
+                baseChange = EloCalculator.ApplyMinimumChangeGuarantee(baseChange, swing, won, _config.MinRatingChangeMagnitude);
+            }
+
             // Total change
             int totalChange = baseChange + swing;
 

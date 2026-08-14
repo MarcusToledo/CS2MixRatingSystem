@@ -93,6 +93,20 @@ public class MatchService
     }
 
     /// <summary>
+    /// Marca a partida como não mais live, de forma síncrona e imediata (thread principal),
+    /// assim que o resultado é conhecido — antes de qualquer processamento assíncrono.
+    /// Deve ser chamado no handler do evento de fim de partida, antes de despachar o
+    /// processamento assíncrono (Task.Run). Sem isso, uma desconexão que ocorre logo após
+    /// o painel de vitória (comportamento normal do jogador, não abandono) pode ser
+    /// processada pela thread principal antes do processamento assíncrono chegar a marcar
+    /// IsLive como false, e o jogador acaba incorretamente marcado como Abandoned.
+    /// </summary>
+    public void MarkEnded()
+    {
+        IsLive = false;
+    }
+
+    /// <summary>
     /// Processa o fim da partida.
     /// Retorna null se a partida não for válida para ranking.
     /// </summary>
